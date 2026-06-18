@@ -150,7 +150,7 @@ const AdminPanel: React.FC = () => {
         } else showToast('添加失败，该用户已在小组内', 'error');
     };
 
-    // 更换小组组长
+    // 更换小组组长（修复catch语法：catch (err)）
     const changeGroupLeader = async (groupId: string, uid: string) => {
         try {
             const res = await authFetch('/api/group/set-leader', {
@@ -162,7 +162,7 @@ const AdminPanel: React.FC = () => {
             await fetchAllData();
             await fetchCurrentGroupMember(groupId);
             showToast('组长更换完成');
-        } catch () {
+        } catch (err) {
             showToast('网络请求异常', 'error');
         }
     };
@@ -520,7 +520,7 @@ const AdminPanel: React.FC = () => {
                                                 padding: '8px 10px',
                                                 border: '1px solid #dcdfe6',
                                                 borderRadius: '6px',
-                                                marginBottom: '10px',
+                                                marginBottom: '8px',
                                                 fontSize: '14px'
                                             }}
                                         />
@@ -534,7 +534,7 @@ const AdminPanel: React.FC = () => {
                                                 padding: '8px 10px',
                                                 border: '1px solid #dcdfe6',
                                                 borderRadius: '6px',
-                                                marginBottom: '14px',
+                                                marginBottom: '10px',
                                                 fontSize: '14px',
                                                 resize: 'none'
                                             }}
@@ -570,62 +570,23 @@ const AdminPanel: React.FC = () => {
                                         borderRadius: '10px'
                                     }}>
                                         <h5 style={{ margin: '0 0 12px', fontSize: '15px' }}>组员权限管理</h5>
-                                        <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#666' }}>添加系统用户至本小组</p>
-                                        <select style={{
-                                            width: '100%',
-                                            padding: '8px 10px',
-                                            border: '1px solid #dcdfe6',
-                                            borderRadius: '6px',
-                                            marginBottom: '12px',
-                                            fontSize: '14px'
-                                        }}
-                                            onChange={ev => {
-                                                const uid = ev.target.value;
-                                                if (uid) addGroupMember(group.id, uid);
-                                            }}>
-                                            <option value="">-- 选择用户 --</option>
+                                        <p style={{ fontSize: '12px', margin: '6px 0' }}>添加用户</p>
+                                        <select style={{ width: '100%', padding: '6px', marginBottom: '10px' }} onChange={ev => { const uid = ev.target.value; if (uid) addGroupMember(group.id, uid); }}>
+                                            <option value="">选择用户加入</option>
                                             {allUserList?.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
                                         </select>
-
-                                        <p style={{ margin: '0 0 6px', fontSize: '13px', color: '#666' }}>更换小组组长（仅本组成员）</p>
-                                        <select style={{
-                                            width: '100%',
-                                            padding: '8px 10px',
-                                            border: '1px solid #dcdfe6',
-                                            borderRadius: '6px',
-                                            marginBottom: '14px',
-                                            fontSize: '14px'
-                                        }}
-                                            onChange={ev => {
-                                                const uid = ev.target.value;
-                                                if (uid) changeGroupLeader(group.id, uid);
-                                            }}>
-                                            <option value="">-- 选择组员作为组长 --</option>
+                                        <p style={{ fontSize: '12px', margin: '6px 0' }}>更换组长</p>
+                                        <select style={{ width: '100%', padding: '6px', marginBottom: '10px' }} onChange={ev => { const uid = ev.target.value; if (uid) changeGroupLeader(group.id, uid); }}>
+                                            <option value="">选择本组成员</option>
                                             {currentGroupMembers?.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
                                         </select>
-                                        <button onClick={() => setMemberPanelId(null)} style={{
-                                            width: '100%',
-                                            padding: '7px',
-                                            border: '1px solid #dcdfe6',
-                                            borderRadius: '6px',
-                                            background: '#fff',
-                                            cursor: 'pointer',
-                                            fontSize: '13px'
-                                        }}>关闭管理面板</button>
+                                        <button onClick={() => setMemberPanelId(null)} style={{ width: '100%', padding: '6px' }}>关闭</button>
                                     </div>
                                 )}
                             </div>
                         ))}
                     </div>
-
-                    {groups?.length === 0 && (
-                        <div style={{
-                            padding: '60px 0',
-                            textAlign: 'center',
-                            color: '#86909c',
-                            fontSize: '15px'
-                        }}>暂无任何小组，点击上方「新建小组」创建第一个小组</div>
-                    )}
+                    {groups?.length === 0 && <p style={{ textAlign: "center", padding: "3rem", color: "#888" }}>暂无小组，请点击上方新建</p>}
                 </div>
             </div>
         </div>
