@@ -3,25 +3,39 @@ import jwt from 'jsonwebtoken';
 import db from '../../../lib/db';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    if (req.method !== 'PUT') return res.status(405).end();
-    const auth = req.headers.authorization;
-    if (!auth) return res.status(401).end();
-    const token = auth.split(' ')[1];
+    if (req.method !== 'GET') {
+        return res.status(405).json({ success: false, data: [], msg: '仅支持GET请求' });
+    }
 
-    let payload: { id: string; role: string };
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).json({ success: false, data: [], msg: '未登录' });
+    }
+    const token = authHeader.split(' ')[1];
+
     try {
-        payload = jwt.verify(token, process.env.JWT_SECRET!) as { id: string; role: string };
-    } catch {
-        return res.status(401).end();
+        jwt.verify(token, process.env.JWT_SECRET!);
+    } catch (err) {
+        console.error('token校验失败', err);
+        return res.status(401).json({ success: false, data: [], msg: '登录失效' });
     }
-    if (payload.role !== 'admin') return res.status(403).end();
 
-    const { groupId, userId, newRole } = req.body;
-    // 修改小组组长
-    if (newRole === 'leader') {
-        await db.query('UPDATE groups SET leader_id = $1 WHERE id = $2', [userId, groupId]);
+    const { groupId } = req.query;
+    if (!groupId || typeof groupId !== 'string') {
+        return res.status(400).json({ success: false, data: [], msg: '小组ID无效' });
     }
-    // 修改用户全局角色
-    await db.query('UPDATE users SET role = $1 WHERE id = $2', [newRole, userId]);
-    res.json({ success: true });
+
+    try {
+        const sql = `
+      SELECT u.id, u.username
+      FROM group_members gm
+      JOIN users u ON gm.user_id = u.id
+      WHERE gm.group_id = $1
+    `;
+        const result = await db.query(sql, [groupId]);
+        return res.json(result.rows);
+    } catch (sqlErr) {
+        console.error('group-members SQL异常', sqlErr);
+        return res.status(500).json({ success: false, data: [], msg: '数据库查询失败' });
+    }
 }
