@@ -108,24 +108,24 @@ const Dashboard: React.FC = () => {
                             notifications.map(notification => (
                                 <div
                                     key={notification.id}
-                                    className={`notification ${notification.is_read ? 'read' : 'unread'}`
-                                        >
-                  <h4>{notification.title}</h4>
-                  <p>{notification.content}</p>
-                  <small>
-                    From: {notification.sender_name} |{' '}
-                    {new Date(notification.created_at).toLocaleString()}
-                  </small>
-                </div>
-                    ))
-                    ) : (
-                    <p>No notifications</p>
-            )}
-                </div>
-            </aside>
-        </main>
-    </div >
-  );
+                                    className={`notification ${notification.is_read ? 'read' : 'unread'}`}
+                                >
+                                    <h4>{notification.title}</h4>
+                                    <p>{notification.content}</p>
+                                    <small>
+                                        From: {notification.sender_name} |{' '}
+                                        {new Date(notification.created_at).toLocaleString()}
+                                    </small>
+                                </div>
+                            ))
+                        ) : (
+                            <p>No notifications</p>
+                        )}
+                    </div>
+                </aside>
+            </main>
+        </div >
+    );
 };
 
 interface GroupViewProps {
