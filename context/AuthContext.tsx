@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, AuthContextType } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -6,42 +6,52 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
 
-    const login = async (username: string, password: string): Promise<boolean> => {
-        try {
-            const response = await fetch('/api?endpoint=auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem('token', data.token);
-                setUser(data.user);
-                return true;
-            } else {
-                return false;
+    // 页面刷新自动读取token，恢复登录态（新增持久化逻辑）
+    useEffect(() => {
+        const initUser = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            try {
+                const res = await fetch('/api/me', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const userData = await res.json();
+                    setUser(userData);
+                } else {
+                    localStorage.removeItem('token');
+                }
+            } catch (err) {
+                localStorage.removeItem('token');
             }
-        } catch (error) {
-            console.error('Login error:', error);
-            return false;
+        };
+        initUser();
+    }, []);
+
+    const login = async (username: string, password: string): Promise<boolean> => {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        });
+        const data = await response.json();
+        if (response.ok) {
+            localStorage.setItem('token', data.token);
+            setUser(data.user);
+            return true;
         }
-    };
+        return false;
+    }; // 删掉多余 };
 
     const register = async (username: string, email: string, password: string): Promise<boolean> => {
-        try {
-            const response = await fetch('/api?endpoint=auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, email, password }),
-            });
-
-            return response.ok;
-        } catch (error) {
-            console.error('Registration error:', error);
-            return false;
-        }
-    };
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password }),
+        });
+        const data = await response.json();
+        return data.success;
+    }; // 删掉多余 };
 
     const logout = () => {
         localStorage.removeItem('token');
