@@ -1,91 +1,84 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useRouter } from 'next/router';
 
-export type User = {
-  id: string;
-  username: string;
-  role: string;
-};
+const LoginForm: React.FC = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [email, setEmail] = useState('');
+  const { login, register } = useAuth();
+  const router = useRouter();
 
-type AuthContextType = {
-  user: User | null;
-  logout: () => void;
-  refreshUser: () => Promise<boolean>;
-  login: (username: string, password: string) => Promise<boolean>;
-  register: (username: string, email: string, password: string) => Promise<boolean>;
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-
-  // 刷新当前登录用户信息
-  const refreshUser = async (): Promise<boolean> => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setUser(null);
-      return false;
-    }
-    const res = await fetch('/api/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    if (data.success) {
-      setUser(data.data);
-      return true;
+    if (isRegistering) {
+      const success = await register(username, email, password);
+      if (success) {
+        alert('注册成功！请登录');
+        setIsRegistering(false);
+      } else {
+        alert('注册失败，请重试');
+      }
     } else {
-      localStorage.removeItem('token');
-      setUser(null);
-      return false;
+      const success = await login(username, password);
+      if (success) {
+        router.push('/dashboard');
+      } else {
+        alert('账号或密码错误');
+      }
     }
   };
-
-  // 登录方法，给LoginForm调用
-  const login = async (username: string, password: string): Promise<boolean> => {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) return false;
-    localStorage.setItem('token', data.token);
-    await refreshUser();
-    return true;
-  };
-
-  // 注册方法，给LoginForm调用
-  const register = async (username: string, email: string, password: string): Promise<boolean> => {
-    const res = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password }),
-    });
-    const data = await res.json();
-    return data.success;
-  };
-
-  // 退出登录
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-    window.location.href = '/login';
-  };
-
-  // 页面初始化自动校验登录
-  useEffect(() => {
-    refreshUser();
-  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, logout, refreshUser, login, register }}>
-      {children}
-    </AuthContext.Provider>
+    <div className="login-container">
+      <h2>{isRegistering ? '注册账号' : '系统登录'}</h2>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>用户名：</label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+        </div>
+        {isRegistering && (
+          <div>
+            <label>邮箱：</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+        )}
+        <div>
+          <label>密码：</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button type="submit">{isRegistering ? '注册' : '登录'}</button>
+      </form>
+      <p style={{ marginTop: 12, textAlign: 'center' }}>
+        {isRegistering ? '已有账号？' : '没有账号？'}{' '}
+        <button
+          type="button"
+          style={{ background: 'transparent', border: 'none', color: '#0070f3', cursor: 'pointer' }}
+          onClick={() => setIsRegistering(!isRegistering)}
+        >
+          {isRegistering ? '去登录' : '去注册'}
+        </button>
+      </p>
+    </div>
   );
 };
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth 必须包裹在 AuthProvider 中使用');
-  return ctx;
-}
+// 关键：底部默认导出，匹配 login.tsx 的 import LoginForm from
+export default LoginForm;
