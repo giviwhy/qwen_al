@@ -31,6 +31,7 @@ type TaskItem = {
 export default function GroupLeaderPage() {
     const { user, logout } = useAuth();
     const router = useRouter();
+    const [loading, setLoading] = useState(true); // 全局加载锁
     const [myGroups, setMyGroups] = useState<GroupItem[]>([]);
     const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
     const [members, setMembers] = useState<MemberItem[]>([]);
@@ -47,62 +48,98 @@ export default function GroupLeaderPage() {
     const [editOpen, setEditOpen] = useState(false);
     const [editTask, setEditTask] = useState<TaskItem | null>(null);
 
-    // 权限校验：未登录 / 超级管理员直接进admin
+    // 第一步：鉴权+等待用户加载完成
     useEffect(() => {
-        if (!user) {
-            router.push('/login');
-            return;
-        }
-        if (user.role === 'admin') {
-            router.push('/admin');
-        }
+        const checkAuth = async () => {
+            setLoading(true);
+            if (!user) {
+                router.push('/login');
+                setLoading(false);
+                return;
+            }
+            if (user.role === 'admin') {
+                router.push('/admin');
+                setLoading(false);
+                return;
+            }
+            setLoading(false);
+        };
+        checkAuth();
     }, [user, router]);
 
-    // 加载当前用户作为组长的所有小组
+    // 加载当前用户作为组长的所有小组（仅登录成功后执行）
     useEffect(() => {
-        if (!user) return;
+        if (loading || !user || user.role === 'admin') return;
         const fetchLeaderGroups = async () => {
             const token = localStorage.getItem('token');
-            const res = await fetch(`/api/user-leader-groups`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success) setMyGroups(data.data);
+            if (!token) {
+                router.push('/login');
+                return;
+            }
+            try {
+                const res = await fetch(`/api/user-leader-groups`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) setMyGroups(data.data);
+            } catch (err) {
+                console.error('加载小组失败', err);
+                alert('小组列表加载失败，请刷新页面');
+            }
         };
         fetchLeaderGroups();
-    }, [user]);
+    }, [user, loading]);
 
-    // 切换小组：加载组员 + 本组任务
+    // 切换小组：加载组员 + 本组任务，增加失败弹窗提示
     useEffect(() => {
-        if (!activeGroupId || !user) return;
+        if (!activeGroupId || loading || !user) return;
         const token = localStorage.getItem('token');
+        if (!token) return;
         const fetchAll = async () => {
-            // 加载组员
-            const memRes = await fetch(`/api/group-members?groupId=${activeGroupId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const memData = await memRes.json();
-            if (memData.success) setMembers(memData.data);
+            try {
+                // 加载组员
+                const memRes = await fetch(`/api/group-members?groupId=${activeGroupId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const memData = await memRes.json();
+                if (memData.success) {
+                    setMembers(memData.data);
+                } else {
+                    alert(`组员加载失败：${memData.msg}`);
+                }
 
-            // 加载本组任务
-            const taskRes = await fetch(`/api/group/${activeGroupId}/tasks?groupId=${activeGroupId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const taskData = await taskRes.json();
-            if (taskData.success) setTaskList(taskData.data);
+                // 加载本组任务
+                const taskRes = await fetch(`/api/group/${activeGroupId}/tasks`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const taskData = await taskRes.json();
+                if (taskData.success) {
+                    setTaskList(taskData.data);
+                } else {
+                    alert(`任务加载失败：${taskData.msg}`);
+                }
+            } catch (err) {
+                console.error('加载组员/任务失败', err);
+                alert('网络请求异常，请重新选择小组');
+            }
         };
         fetchAll();
-    }, [activeGroupId, user]);
+    }, [activeGroupId, user, loading]);
 
     // 刷新任务列表公共方法
     const refreshTasks = async () => {
-        if (!activeGroupId) return;
+        if (!activeGroupId || loading) return;
         const token = localStorage.getItem('token');
-        const res = await fetch(`/api/group/${activeGroupId}/tasks?groupId=${activeGroupId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (data.success) setTaskList(data.data);
+        try {
+            const res = await fetch(`/api/group/${activeGroupId}/tasks`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) setTaskList(data.data);
+        } catch (err) {
+            console.error('刷新任务失败', err);
+            alert('刷新任务列表失败');
+        }
     };
 
     // 发布新任务
@@ -110,30 +147,35 @@ export default function GroupLeaderPage() {
         e.preventDefault();
         if (!activeGroupId || !assignUserId || !taskTitle.trim()) return;
         const token = localStorage.getItem('token');
-        const res = await fetch(`/api/group/${activeGroupId}/tasks`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                groupId: activeGroupId,
-                title: taskTitle,
-                description: taskDesc,
-                assignedTo: assignUserId,
-                dueDate,
-                priority
-            })
-        });
-        const data = await res.json();
-        alert(data.msg);
-        if (data.success) {
-            setTaskTitle('');
-            setTaskDesc('');
-            setAssignUserId('');
-            setDueDate('');
-            setPriority('medium');
-            refreshTasks();
+        try {
+            const res = await fetch(`/api/group/${activeGroupId}/tasks`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    groupId: activeGroupId,
+                    title: taskTitle,
+                    description: taskDesc,
+                    assignedTo: assignUserId,
+                    dueDate,
+                    priority
+                })
+            });
+            const data = await res.json();
+            alert(data.msg);
+            if (data.success) {
+                setTaskTitle('');
+                setTaskDesc('');
+                setAssignUserId('');
+                setDueDate('');
+                setPriority('medium');
+                refreshTasks();
+            }
+        } catch (err) {
+            alert('发布任务请求失败');
+            console.error(err);
         }
     };
 
@@ -153,28 +195,33 @@ export default function GroupLeaderPage() {
         e.preventDefault();
         if (!editTask || !activeGroupId || !assignUserId || !taskTitle.trim()) return;
         const token = localStorage.getItem('token');
-        const res = await fetch('/api/group/task-update', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                taskId: editTask.id,
-                title: taskTitle,
-                description: taskDesc,
-                assignedTo: assignUserId,
-                status: editTask.status,
-                dueDate,
-                priority
-            })
-        });
-        const data = await res.json();
-        alert(data.msg);
-        if (data.success) {
-            setEditOpen(false);
-            setEditTask(null);
-            refreshTasks();
+        try {
+            const res = await fetch('/api/group/task-update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    taskId: editTask.id,
+                    title: taskTitle,
+                    description: taskDesc,
+                    assignedTo: assignUserId,
+                    status: editTask.status,
+                    dueDate,
+                    priority
+                })
+            });
+            const data = await res.json();
+            alert(data.msg);
+            if (data.success) {
+                setEditOpen(false);
+                setEditTask(null);
+                refreshTasks();
+            }
+        } catch (err) {
+            alert('修改任务请求失败');
+            console.error(err);
         }
     };
 
@@ -182,20 +229,28 @@ export default function GroupLeaderPage() {
     const handleDeleteTask = async (tid: string) => {
         if (!window.confirm('确定删除该任务？')) return;
         const token = localStorage.getItem('token');
-        const res = await fetch('/api/group/task-delete', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ taskId: tid })
-        });
-        const data = await res.json();
-        alert(data.msg);
-        if (data.success) refreshTasks();
+        try {
+            const res = await fetch('/api/group/task-delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({ taskId: tid })
+            });
+            const data = await res.json();
+            alert(data.msg);
+            if (data.success) refreshTasks();
+        } catch (err) {
+            alert('删除任务请求失败');
+            console.error(err);
+        }
     };
 
-    if (!user || user.role === 'admin') return <div className="p-10">跳转中...</div>;
+    // 加载中阻断页面渲染
+    if (loading || !user || user.role === 'admin') {
+        return <div className="p-10 text-center text-lg">页面加载/跳转中...</div>;
+    }
 
     return (
         <div className="max-w-7xl mx-auto p-6">
@@ -245,12 +300,12 @@ export default function GroupLeaderPage() {
                 </div>
             </div>
 
-            {/* 下方：任务发布 + 任务列表 */}
+            {/* 下方：任务发布 + 任务列表，选中小组才显示 */}
             {activeGroupId && (
                 <div className="mt-8 border rounded p-4">
                     <h2 className="text-lg font-semibold mb-6">本组任务管理</h2>
 
-                    {/* 新建任务表单 */}
+                    {/* 新建任务表单（核心发布区域） */}
                     <form onSubmit={handleCreateTask} className="border-b pb-6 mb-8 space-y-4">
                         <h3 className="font-medium text-base">发布新任务</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -285,11 +340,15 @@ export default function GroupLeaderPage() {
                                     required
                                 >
                                     <option value="">请选择组员</option>
-                                    {members.map(m => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.username}{m.is_leader ? ' (组长)' : ''}
-                                        </option>
-                                    ))}
+                                    {members.length === 0 ? (
+                                        <option disabled value="">暂无本组组员，无法发布任务</option>
+                                    ) : (
+                                        members.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.username}{m.is_leader ? ' (组长)' : ''}
+                                            </option>
+                                        ))
+                                    )}
                                 </select>
                             </div>
                             <div>
@@ -312,15 +371,20 @@ export default function GroupLeaderPage() {
                                 placeholder="填写任务要求、交付标准"
                             />
                         </div>
-                        <button type="submit" className="px-5 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-                            发布任务
+                        {/* 无组员时按钮置灰不可点击 */}
+                        <button
+                            type="submit"
+                            disabled={members.length === 0}
+                            className={`px-5 py-2 rounded ${members.length > 0 ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-300 cursor-not-allowed text-gray-500'}`}
+                        >
+                            {members.length === 0 ? '暂无组员，无法发布' : '发布任务'}
                         </button>
                     </form>
 
                     {/* 本组任务列表 */}
                     <h3 className="font-medium text-base mb-4">全部任务</h3>
                     {taskList.length === 0 ? (
-                        <p className="text-gray-500">暂无任务</p>
+                        <p className="text-gray-500">暂无任务，可在上方表单发布新任务</p>
                     ) : (
                         <div className="space-y-4">
                             {taskList.map(t => (

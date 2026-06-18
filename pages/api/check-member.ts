@@ -1,44 +1,48 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
+import pool from '../../lib/db';
 import jwt from 'jsonwebtoken';
-import db from '../../lib/db';
 
-// 所有业务代码必须包裹在这个handler函数内部
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // 仅允许GET请求
     if (req.method !== 'GET') {
-        return res.status(405).json({ success: false, msg: '仅支持GET请求' });
+        return res.status(405).json({ success: false, msg: 'Method Not Allowed' });
     }
 
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (!JWT_SECRET) {
+        return res.status(500).json({ success: false, msg: '服务密钥未配置' });
+    }
+
+    // 提取Bearer Token
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ success: false, msg: '未登录，请先登录' });
-    }
-    const token = authHeader.split(' ')[1];
-    try {
-        jwt.verify(token, process.env.JWT_SECRET!);
-    } catch {
-        return res.status(401).json({ success: false, msg: '登录已失效，请重新登录' });
-    }
-
-    // 取参数的代码移到函数内部
-    const { groupId, userId } = req.query;
-    const gid = Array.isArray(groupId) ? groupId[0] : groupId;
-    const uid = Array.isArray(userId) ? userId[0] : userId;
-
-    if (!gid || !uid) {
-        return res.status(400).json({ success: false, msg: 'groupId、userId不能为空' });
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    if (!token) {
+        return res.status(401).json({ success: false, msg: 'Unauthorized' });
     }
 
     try {
-        const result = await db.query(
-            'SELECT id FROM group_members WHERE group_id = $1 AND user_id = $2',
-            [gid, uid]
-        );
+        // 校验JWT并解析角色
+        const payload = jwt.verify(token, JWT_SECRET) as { role: string };
+        // 仅超级管理员可访问
+        if (payload.role !== 'admin') {
+            return res.status(403).json({ success: false, msg: 'Forbidden：仅管理员可查询' });
+        }
+
+        // 查询所有已占用用户ID（组长+组员）
+        const sql = `
+            SELECT DISTINCT leader_id AS user_id FROM "groups" WHERE leader_id IS NOT NULL
+            UNION
+            SELECT DISTINCT user_id FROM group_members
+        `;
+        const result = await pool.query(sql, []);
+        const occupiedUserIds = result.rows.map(row => row.user_id);
+
         return res.status(200).json({
             success: true,
-            isMember: result.rows.length > 0
+            data: occupiedUserIds
         });
-    } catch (dbErr) {
-        console.error('数据库查询异常：', dbErr);
-        return res.status(500).json({ success: false, msg: '数据库查询失败' });
+    } catch (err) {
+        console.error('查询all-occupied-user-ids接口异常：', err);
+        return res.status(401).json({ success: false, msg: 'Token invalid' });
     }
 }
