@@ -58,7 +58,7 @@ const Dashboard: React.FC = () => {
         return response;
     };
 
-    // 路由就绪后判断登录态，增加加载锁
+    // 路由就绪后判断登录态
     useEffect(() => {
         if (!router.isReady) return;
         setLoading(true);
@@ -83,23 +83,30 @@ const Dashboard: React.FC = () => {
     // 获取全部系统用户（管理员添加新成员用）
     const fetchAllUsers = async () => {
         const res = await authFetch('/api/users');
-        if (res.ok) setAllUserList(await res.json());
+        if (res.ok) {
+            const json = await res.json();
+            setAllUserList(json.data || []);
+        }
     };
 
     // 获取当前选中小组内部成员
     const fetchCurrentGroupMember = async (gid: string) => {
         const res = await authFetch(`/api/group-members?groupId=${gid}`);
-        if (res.ok) setCurrentGroupMembers(await res.json());
+        if (res.ok) {
+            const json = await res.json();
+            setCurrentGroupMembers(json.data || []);
+        }
     };
 
-    // 加载小组、通知基础数据
+    // 加载小组、通知基础数据【核心修复：只取接口返回的data数组】
     const fetchData = async () => {
         setLoading(true);
         try {
-            // 1. 获取小组
+            // 1. 获取小组列表
             const groupsRes = await authFetch('/api/groups');
             if (groupsRes.ok) {
-                const groupsData = await groupsRes.json();
+                const json = await groupsRes.json();
+                const groupsData = json.data || [];
                 setGroups(groupsData);
                 // 自动选中第一个小组
                 if (!selectedGroup && groupsData.length > 0) {
@@ -107,11 +114,11 @@ const Dashboard: React.FC = () => {
                 }
             }
 
-            // 2. 获取通知
+            // 2. 获取通知列表
             const notifyRes = await authFetch('/api/notifications');
             if (notifyRes.ok) {
-                const notifyData = await notifyRes.json();
-                setNotifications(notifyData);
+                const json = await notifyRes.json();
+                setNotifications(json.data || []);
             }
         } catch (err) {
             console.error('拉取首页数据失败：', err);
@@ -383,7 +390,7 @@ const Dashboard: React.FC = () => {
                     )}
 
                     <div className="groups-list">
-                        {groups.map((group) => (
+                        {groups?.map((group) => (
                             <div
                                 key={group.id}
                                 className={`group-item ${selectedGroup === group.id ? 'active' : ''}`}
@@ -401,7 +408,7 @@ const Dashboard: React.FC = () => {
                                 <p style={{ fontSize: '13px', marginBottom: '6px' }}>
                                     {group.description || '暂无描述'}
                                 </p>
-                                <small>组长：{group.leader_name ?? '暂无组长'}</small>
+                                <small>组长：{group?.leader_name ?? '暂无组长'}</small>
 
                                 {/* 管理员操作按钮 */}
                                 {user?.role === 'admin' && (
@@ -469,7 +476,7 @@ const Dashboard: React.FC = () => {
                                             }}
                                         >
                                             <option value="">选择用户加入小组</option>
-                                            {allUserList.map((u) => (
+                                            {allUserList?.map((u) => (
                                                 <option key={u.id} value={u.id}>
                                                     {u.username}
                                                 </option>
@@ -485,7 +492,7 @@ const Dashboard: React.FC = () => {
                                             }}
                                         >
                                             <option value="">选择本组成员设为组长</option>
-                                            {currentGroupMembers.map((u) => (
+                                            {currentGroupMembers?.map((u) => (
                                                 <option key={u.id} value={u.id}>
                                                     {u.username}
                                                 </option>
@@ -549,8 +556,8 @@ const Dashboard: React.FC = () => {
                 <aside className="notifications-panel" style={{ width: '280px', border: "1px solid #eee", padding: "12px", borderRadius: "8px" }}>
                     <h2 style={{ marginBottom: '12px' }}>消息通知</h2>
                     <div className="notifications-list">
-                        {notifications.length > 0 ? (
-                            notifications.map((notification) => (
+                        {notifications?.length > 0 ? (
+                            notifications?.map((notification) => (
                                 <div
                                     key={notification.id}
                                     className={`notification ${notification.is_read ? '' : 'unread'}`}
@@ -566,7 +573,7 @@ const Dashboard: React.FC = () => {
                                         {notification.content}
                                     </p>
                                     <small style={{ fontSize: '12px' }}>
-                                        发送人：{notification.sender_name}
+                                        发送人：{notification?.sender_name}
                                         {!notification.group_id && (
                                             <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>【全站公告】</span>
                                         )}
@@ -613,8 +620,8 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch, userRole, cur
         try {
             const res = await authFetch(`/api/tasks?groupId=${groupId}`);
             if (res.ok) {
-                const taskData = await res.json();
-                setTasks(taskData);
+                const json = await res.json();
+                setTasks(json.data || []);
             }
         } catch (err) {
             console.error('加载任务失败', err);
@@ -693,7 +700,7 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch, userRole, cur
                             style={{ flex: 1, padding: 8, border: "1px solid #ddd", borderRadius: "4px" }}
                         >
                             <option value="">选择负责人</option>
-                            {currentGroupMembers.map(m => (
+                            {currentGroupMembers?.map(m => (
                                 <option key={m.id} value={m.id}>{m.username}</option>
                             ))}
                         </select>
@@ -723,11 +730,11 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch, userRole, cur
             )}
 
             {/* 任务列表 */}
-            {tasks.length === 0 ? (
+            {tasks?.length === 0 ? (
                 <p style={{ textAlign: "center", padding: "2rem", color: "#888" }}>该小组暂无任务</p>
             ) : (
                 <div style={{ border: '1px solid #ddd', borderRadius: 6 }}>
-                    {tasks.map(task => (
+                    {tasks?.map(task => (
                         <div key={task.id} style={{ padding: 12, borderBottom: '1px solid #eee' }}>
                             <h4>{task.title}
                                 {task.priority === 'high' && <span style={{ color: 'red', marginLeft: 8 }}>高优</span>}
@@ -735,9 +742,9 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch, userRole, cur
                             </h4>
                             <p style={{ fontSize: 13, margin: 4 }}>{task.description || '无描述'}</p>
                             <div style={{ fontSize: 12, color: '#666', margin: 6 }}>
-                                负责人：{task.assignee_name || '未分配'}
+                                负责人：{task?.assignee_name || '未分配'}
                                 &nbsp;|&nbsp;
-                                创建人：{task.creator_name}
+                                创建人：{task?.creator_name}
                                 &nbsp;|&nbsp;
                                 截止日期：{task.due_date || '无'}
                                 &nbsp;|&nbsp;
