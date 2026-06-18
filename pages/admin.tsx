@@ -7,6 +7,8 @@ const AdminPanel: React.FC = () => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [allUserList, setAllUserList] = useState<User[]>([]);
     const [currentGroupMembers, setCurrentGroupMembers] = useState<User[]>([]);
+    // 新增：全局已分配（组长/组员）用户ID
+    const [allOccupiedUserIds, setAllOccupiedUserIds] = useState<string[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const { user, logout } = useAuth();
@@ -76,7 +78,7 @@ const AdminPanel: React.FC = () => {
         setTimeout(() => setToast(p => ({ ...p, show: false })), 3000);
     };
 
-    // 加载全部小组、全部系统用户
+    // 加载全部小组、全部系统用户、全局占用用户
     const fetchAllData = async () => {
         try {
             const groupRes = await authFetch('/api/groups');
@@ -90,6 +92,12 @@ const AdminPanel: React.FC = () => {
             if (userRes.ok) {
                 const json = await userRes.json();
                 setAllUserList(json.data || []);
+            }
+            // 新增：拉取所有已加入小组/担任组长的用户ID
+            const occupyRes = await authFetch('/api/all-occupied-user-ids');
+            if (occupyRes.ok) {
+                const occupyJson = await occupyRes.json();
+                setAllOccupiedUserIds(occupyJson.data ?? []);
             }
         } catch (err) {
             showToast('数据加载失败', 'error');
@@ -110,18 +118,8 @@ const AdminPanel: React.FC = () => {
         return groups.map(g => g.leader_id).filter(Boolean) as string[];
     };
 
-    // 获取【已加入任意小组】的用户ID
-    const getAllJoinedUserIds = () => {
-        const ids: string[] = [];
-        groups.forEach(g => {
-            g.member_ids?.forEach((uid: string) => ids.push(uid));
-            if (g.leader_id) ids.push(g.leader_id);
-        });
-        return [...new Set(ids)];
-    };
-
-    // 筛选：未加入任何小组，可添加的候选用户
-    const availableAddUsers = allUserList.filter(u => !getAllJoinedUserIds().includes(u.id));
+    // 修改：过滤仅展示无任何小组归属的用户
+    const availableAddUsers = allUserList.filter(u => !allOccupiedUserIds.includes(u.id));
     // 筛选：当前小组内、且不是其他小组组长，可被指定为本组组长
     const availableLeaderCandidates = currentGroupMembers.filter(u => !getGlobalLeaderIds().includes(u.id));
 
@@ -614,7 +612,7 @@ const AdminPanel: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* 组员管理面板（核心改造：多选添加、删除成员、指定组长） */}
+                                {/* 组员管理面板（多选添加、删除成员、指定组长） */}
                                 {memberPanelId === group.id && (
                                     <div onClick={e => e.stopPropagation()} style={{
                                         marginTop: '16px',
@@ -624,7 +622,7 @@ const AdminPanel: React.FC = () => {
                                     }}>
                                         <h5 style={{ margin: '0 0 12px', fontSize: '15px' }}>组员权限管理</h5>
 
-                                        {/* 区域1：批量多选添加组员（过滤已入组/其他组长） */}
+                                        {/* 批量多选添加组员 */}
                                         <div style={{ marginBottom: '16px' }}>
                                             <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>批量添加组员（仅未加入任何小组用户可选）</p>
                                             <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px #ddd solid', padding: '8px', borderRadius: '6px', background: '#fff' }}>
@@ -651,7 +649,7 @@ const AdminPanel: React.FC = () => {
                                             </button>
                                         </div>
 
-                                        {/* 区域2：当前小组全部组员，支持移除 */}
+                                        {/* 当前小组全部组员，支持移出 */}
                                         <div style={{ marginBottom: '16px' }}>
                                             <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>本小组现有成员（可移出）</p>
                                             <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px #ddd solid', padding: '8px', borderRadius: '6px', background: '#fff' }}>
@@ -670,7 +668,7 @@ const AdminPanel: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* 区域3：指定本组组长（过滤其他小组组长） */}
+                                        {/* 指定本组组长（过滤其他小组组长） */}
                                         <div style={{ marginBottom: '16px' }}>
                                             <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>设置本组组长（已担任其他小组组长的用户不可选）</p>
                                             <select
