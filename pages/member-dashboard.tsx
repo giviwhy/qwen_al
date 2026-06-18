@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/router';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import NotifyBell from '../components/NotifyBell';
 
 type Group = {
     id: string;
@@ -62,11 +63,17 @@ export default function MemberDashboard() {
         const fetchGroups = async () => {
             const token = localStorage.getItem('token');
             if (!token) return router.push('/login');
-            const res = await fetch(`/api/user-member-groups`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success) setGroups(data.data);
+            try {
+                const res = await fetch(`/api/user-member-groups`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('小组接口异常');
+                const data = await res.json();
+                if (data.success) setGroups(data.data);
+            } catch (err) {
+                console.error('加载小组失败', err);
+                alert('小组列表加载失败，请刷新页面');
+            }
         };
         fetchGroups();
     }, [loading, user]);
@@ -76,15 +83,21 @@ export default function MemberDashboard() {
         if (!activeGroupId || loading) return;
         const loadTasks = async () => {
             const token = localStorage.getItem('token');
-            const res = await fetch(`/api/member-tasks?groupId=${activeGroupId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (!data.success) return alert(data.msg);
-            const todo = data.data.filter((t: Task) => t.status === 'todo');
-            const doing = data.data.filter((t: Task) => t.status === 'doing');
-            const done = data.data.filter((t: Task) => t.status === 'done');
-            setColumns({ todo, doing, done });
+            try {
+                const res = await fetch(`/api/member-tasks?groupId=${activeGroupId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('任务接口异常');
+                const data = await res.json();
+                if (!data.success) return alert(data.msg);
+                const todo = data.data.filter((t: Task) => t.status === 'todo');
+                const doing = data.data.filter((t: Task) => t.status === 'doing');
+                const done = data.data.filter((t: Task) => t.status === 'done');
+                setColumns({ todo, doing, done });
+            } catch (err) {
+                console.error('加载任务失败', err);
+                alert('任务加载失败，请重新选择小组');
+            }
         };
         loadTasks();
     }, [activeGroupId, loading]);
@@ -99,37 +112,45 @@ export default function MemberDashboard() {
         const newStatus = destination.droppableId;
         const token = localStorage.getItem('token');
 
-        // 后端更新状态
-        const res = await fetch('/api/update-task-status', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ taskId, status: newStatus })
-        });
-        const ret = await res.json();
-        if (!ret.success) return alert(ret.msg);
+        try {
+            // 后端更新状态
+            const res = await fetch('/api/update-task-status', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ taskId, status: newStatus })
+            });
+            if (!res.ok) throw new Error('状态更新接口异常');
+            const ret = await res.json();
+            if (!ret.success) return alert(ret.msg);
 
-        // 本地状态更新
-        const sourceCol = [...columns[source.droppableId as keyof ColumnMap]];
-        const destCol = [...columns[destination.droppableId as keyof ColumnMap]];
-        const moveItem = sourceCol.splice(source.index, 1)[0];
-        destCol.splice(destination.index, 0, moveItem);
-        setColumns({
-            ...columns,
-            [source.droppableId]: sourceCol,
-            [destination.droppableId]: destCol
-        });
+            // 本地状态更新
+            const sourceCol = [...columns[source.droppableId as keyof ColumnMap]];
+            const destCol = [...columns[destination.droppableId as keyof ColumnMap]];
+            const moveItem = sourceCol.splice(source.index, 1)[0];
+            destCol.splice(destination.index, 0, moveItem);
+            setColumns({
+                ...columns,
+                [source.droppableId]: sourceCol,
+                [destination.droppableId]: destCol
+            });
+        } catch (err) {
+            console.error('拖拽更新失败', err);
+            alert('仅可拖拽分配给你本人的任务');
+        }
     };
 
-    if (loading || !user || user.role !== 'member') return <div className="p-10">加载中...</div>;
+    if (loading || !user || user.role !== 'member') return <div className="p-10 text-center">页面加载/跳转中...</div>;
 
     return (
         <div className="max-w-7xl mx-auto p-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">组员任务看板</h1>
-                <div className="flex gap-3">
+                {/* 通知铃铛 + 操作按钮 */}
+                <div className="flex items-center gap-3">
+                    <NotifyBell />
                     <button onClick={() => router.push('/dashboard')} className="px-3 py-2 bg-gray-200 rounded">工作台</button>
                     <button onClick={logout} className="px-3 py-2 bg-red-500 text-white rounded">退出</button>
                 </div>
