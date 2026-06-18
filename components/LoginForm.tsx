@@ -18,7 +18,6 @@ const LoginForm: React.FC = () => {
       if (success) {
         alert('注册成功！请登录');
         setIsRegistering(false);
-        // 清空输入框
         setUsername('');
         setEmail('');
         setPassword('');
@@ -28,7 +27,8 @@ const LoginForm: React.FC = () => {
     } else {
       const success = await login(username, password);
       if (success) {
-        router.push('/dashboard');
+        // 延时等待 user 状态更新完成再跳转
+        setTimeout(() => router.push('/dashboard'), 80);
       } else {
         alert('账号或密码错误');
       }

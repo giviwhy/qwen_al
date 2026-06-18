@@ -6,7 +6,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
 
-    // 页面刷新自动读取token，恢复登录态
+    // 页面刷新拉取登录态
     useEffect(() => {
         const initUser = async () => {
             const token = localStorage.getItem('token');
@@ -15,9 +15,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const res = await fetch('/api/me', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                if (res.ok) {
-                    const userData = await res.json();
-                    setUser(userData);
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    // 取 result.data 真实用户对象
+                    setUser(result.data);
                 } else {
                     localStorage.removeItem('token');
                 }
@@ -36,7 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         const data = await response.json();
 
-        // 修复：后端token、user都在data.data里面
         if (response.ok && data.success) {
             localStorage.setItem('token', data.data.token);
             setUser(data.data.user);
