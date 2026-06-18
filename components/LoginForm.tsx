@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/router';
 
@@ -26,10 +26,7 @@ const LoginForm: React.FC = () => {
       }
     } else {
       const success = await login(username, password);
-      if (success) {
-        // 延时等待 user 状态更新完成再跳转
-        setTimeout(() => router.push('/dashboard'), 80);
-      } else {
+      if (!success) {
         alert('账号或密码错误');
       }
     }
@@ -46,10 +43,11 @@ const LoginForm: React.FC = () => {
           <input
             type="text"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
             required
             className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
             placeholder="请输入用户名"
+            autoComplete="username"
           />
         </div>
 
@@ -59,7 +57,7 @@ const LoginForm: React.FC = () => {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
               required
               className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
               placeholder="请输入邮箱"
@@ -72,10 +70,11 @@ const LoginForm: React.FC = () => {
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
             required
             className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
             placeholder="请输入密码"
+            autoComplete="current-password"
           />
         </div>
 
