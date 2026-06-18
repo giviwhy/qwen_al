@@ -5,24 +5,25 @@ import db from '../../../lib/db';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { groupId } = req.query;
     const auth = req.headers.authorization;
-    if (!auth) return res.status(401).end();
+    if (!auth) return res.status(401).json({ success: false, msg: '未登录' });
     const token = auth.split(' ')[1];
 
     let payload: { id: string; role: string };
     try {
         payload = jwt.verify(token, process.env.JWT_SECRET!) as { id: string; role: string };
     } catch {
-        return res.status(401).end();
+        return res.status(401).json({ success: false, msg: 'token失效' });
     }
-    if (payload.role !== 'admin') return res.status(403).end();
+    if (payload.role !== 'admin') return res.status(403).json({ success: false, msg: '无管理员权限' });
 
     // PUT 编辑小组
     if (req.method === 'PUT') {
         const { name, description } = req.body;
         const result = await db.query(`
-      UPDATE groups SET name=$1, description=$2 WHERE id=$3 RETURNING *
-    `, [name, description, groupId]);
-        return res.json(result.rows[0]);
+            UPDATE groups SET name=$1, description=$2 WHERE id=$3 RETURNING *
+        `, [name, description, groupId]);
+        // 统一格式返回
+        return res.json({ success: true, data: result.rows[0] });
     }
 
     // DELETE 删除小组（级联删除任务、通知）
@@ -30,8 +31,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await db.query('DELETE FROM tasks WHERE group_id = $1', [groupId]);
         await db.query('DELETE FROM notifications WHERE group_id = $1', [groupId]);
         await db.query('DELETE FROM groups WHERE id = $1', [groupId]);
-        return res.json({ success: true });
+        return res.json({ success: true, msg: '小组删除成功' });
     }
 
-    return res.status(405).end();
+    return res.status(405).json({ success: false, msg: '请求方法不允许' });
 }
