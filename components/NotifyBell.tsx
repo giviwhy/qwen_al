@@ -1,5 +1,5 @@
-
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 type NotifyItem = {
     id: string;
@@ -11,41 +11,76 @@ type NotifyItem = {
 };
 
 export default function NotifyBell() {
+    const router = useRouter();
     const [showPanel, setShowPanel] = useState(false);
     const [list, setList] = useState<NotifyItem[]>([]);
     const unreadNum = list.filter(i => i.isUnread).length;
 
-    // 拉取通知
+    // 拉取通知（增加token判空、401跳转、异常捕获）
     const loadNotify = async () => {
         const token = localStorage.getItem('token');
-        const res = await fetch('/api/user/get-notifications', {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const json = await res.json();
-        if (json.success) setList(json.data);
+        // 无token直接跳登录
+        if (!token) {
+            router.push('/login');
+            return;
+        }
+        try {
+            const res = await fetch('/api/user/get-notifications', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            // 鉴权失败跳转登录
+            if (res.status === 401) {
+                localStorage.removeItem('token');
+                router.push('/login');
+                return;
+            }
+            const json = await res.json();
+            if (json.success) setList(json.data);
+        } catch (err) {
+            console.error('获取通知失败', err);
+        }
     };
 
     useEffect(() => {
         if (showPanel) loadNotify();
-    }, [showPanel]);
+    }, [showPanel, router]);
 
-    // 标记已读
+    // 标记已读（增加容错）
     const markRead = async (notifyId: string) => {
         const token = localStorage.getItem('token');
-        await fetch('/api/user/read-notification', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ notifyId })
-        });
-        setList(prev => prev.map(item => item.id === notifyId ? { ...item, isUnread: false } : item));
+        if (!token) {
+            router.push('/login');
+            return;
+        }
+        try {
+            const res = await fetch('/api/user/read-notification', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ notifyId })
+            });
+            if (res.status === 401) {
+                localStorage.removeItem('token');
+                router.push('/login');
+                return;
+            }
+            // 本地直接更新状态，不用重新请求接口
+            setList(prev => prev.map(item =>
+                item.id === notifyId ? { ...item, isUnread: false } : item
+            ));
+        } catch (err) {
+            console.error('标记已读失败', err);
+        }
     };
 
     return (
         <div className="relative inline-block">
-            <button onClick={() => setShowPanel(!showPanel)} className="relative p-2 rounded hover:bg-gray-100">
+            <button
+                onClick={() => setShowPanel(!showPanel)}
+                className="relative p-2 rounded hover:bg-gray-100"
+            >
                 🔔
                 {unreadNum > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center">
