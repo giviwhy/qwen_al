@@ -150,12 +150,25 @@ const Dashboard: React.FC = () => {
 
     // 修改组长：仅允许选择本组内成员
     const changeGroupLeader = async (groupId: string, uid: string) => {
-        await authFetch('/api/group/set-leader', {
-            method: 'PUT',
-            body: JSON.stringify({ groupId, newLeaderId: uid })
-        });
-        fetchData();
-        alert('组长更换完成');
+        try {
+            const res = await authFetch('/api/group/set-leader', {
+                method: 'PUT',
+                body: JSON.stringify({ groupId, newLeaderId: uid })
+            });
+            const json = await res.json();
+            if (!json.success) {
+                alert(json.msg || '更换组长失败');
+                return;
+            }
+            // 等待小组列表刷新（更新页面组长文字）
+            await fetchData();
+            // 再刷新当前组员下拉
+            await fetchCurrentGroupMember(groupId);
+            alert('组长更换完成');
+        } catch (err) {
+            console.error('更换组长报错：', err);
+            alert('网络异常，更换失败');
+        }
     };
 
     // 管理员发送全站通知
