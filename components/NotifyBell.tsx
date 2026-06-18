@@ -16,7 +16,7 @@ export default function NotifyBell() {
     const [list, setList] = useState<NotifyItem[]>([]);
     const unreadNum = list.filter(i => i.isUnread).length;
 
-    // 拉取通知（增加token判空、401跳转、异常捕获）
+    // 拉取通知（增加token判空、401跳转、异常捕获 + 通知ID去重）
     const loadNotify = async () => {
         const token = localStorage.getItem('token');
         // 无token直接跳登录
@@ -34,8 +34,21 @@ export default function NotifyBell() {
                 router.push('/login');
                 return;
             }
+            if (!res.ok) {
+                console.warn('通知接口异常，跳过加载');
+                return;
+            }
             const json = await res.json();
-            if (json.success) setList(json.data);
+            if (json.success) {
+                // 根据通知唯一id去重，避免重复渲染
+                const uniqueMap = new Map<string, NotifyItem>();
+                json.data.forEach((item: NotifyItem) => {
+                    if (!uniqueMap.has(item.id)) {
+                        uniqueMap.set(item.id, item);
+                    }
+                });
+                setList(Array.from(uniqueMap.values()));
+            }
         } catch (err) {
             console.error('获取通知失败', err);
         }
