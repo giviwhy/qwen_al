@@ -13,7 +13,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const authHeader = req.headers.authorization;
-    // 校验Bearer标准token格式
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({
             success: false,
@@ -23,13 +22,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const token = authHeader.split(' ')[1];
 
-    let userId: string;
+    let payload: { id: string; role: string };
     try {
-        // 解析token拿到当前登录用户ID
         const secret = process.env.JWT_SECRET;
         if (!secret) throw new Error('JWT密钥未配置');
-        const payload = jwt.verify(token, secret) as { id: string };
-        userId = payload.id;
+        payload = jwt.verify(token, secret) as { id: string; role: string };
     } catch (err) {
         console.error('Token解析失败：', err);
         return res.status(401).json({
@@ -40,21 +37,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-        // 关联组员表，只返回当前用户加入过的小组
-        const sql = `
-            SELECT DISTINCT g.*, u.username AS leader_name
-            FROM groups g
-            LEFT JOIN users u ON g.leader_id = u.id
-            INNER JOIN group_members gm ON g.id = gm.group_id
-            WHERE gm.user_id = $1
-            ORDER BY g.created_at DESC
-        `;
-        const result = await db.query(sql, [userId]);
+        let sql: string;
+        let params: string[];
+        // 管理员：查询全部小组，无过滤
+        if (payload.role === 'admin') {
+            sql = `
+                SELECT DISTINCT g.*, u.username AS leader_name
+                FROM groups g
+                LEFT JOIN users u ON g.leader_id = u.id
+                ORDER BY g.created_at DESC
+            `;
+            params = [];
+        } else {
+            // 普通用户：只查自己加入的小组
+            sql = `
+                SELECT DISTINCT g.*, u.username AS leader_name
+                FROM groups g
+                LEFT JOIN users u ON g.leader_id = u.id
+                INNER JOIN group_members gm ON g.id = gm.group_id
+                WHERE gm.user_id = $1
+                ORDER BY g.created_at DESC
+            `;
+            params = [payload.id];
+        }
+        const result = await db.query(sql, params);
 
         return res.status(200).json({
             success: true,
             msg: '查询成功',
-            data: result.rows || [] // 兜底空数组，防止null
+            data: result.rows || []
         });
     } catch (dbErr) {
         console.error('查询小组数据库异常：', dbErr);
