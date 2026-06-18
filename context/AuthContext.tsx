@@ -6,7 +6,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
 
-    // 页面刷新自动读取token，恢复登录态（新增持久化逻辑）
+    // 页面刷新自动读取token，恢复登录态
     useEffect(() => {
         const initUser = async () => {
             const token = localStorage.getItem('token');
@@ -35,13 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify({ username, password }),
         });
         const data = await response.json();
-        if (response.ok) {
-            localStorage.setItem('token', data.token);
-            setUser(data.user);
+
+        // 修复：后端token、user都在data.data里面
+        if (response.ok && data.success) {
+            localStorage.setItem('token', data.data.token);
+            setUser(data.data.user);
             return true;
         }
         return false;
-    }; // 删掉多余 };
+    };
 
     const register = async (username: string, email: string, password: string): Promise<boolean> => {
         const response = await fetch('/api/register', {
@@ -51,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         const data = await response.json();
         return data.success;
-    }; // 删掉多余 };
+    };
 
     const logout = () => {
         localStorage.removeItem('token');
