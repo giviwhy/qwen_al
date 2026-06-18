@@ -62,13 +62,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
         }
 
-        // 3. 更新任务
+        // 3. 更新任务：assigned_to 改为 assignee_id
         const updateRes = await db.query(`
       UPDATE tasks
       SET
         title = $1,
         description = $2,
-        assigned_to = $3,
+        assignee_id = $3,
         status = $4,
         due_date = $5,
         priority = $6

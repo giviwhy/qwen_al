@@ -63,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const result = await db.query(`
                 SELECT t.*, u.username as assignee_name, c.username as creator_name
                 FROM tasks t
-                LEFT JOIN users u ON t.assigned_to = u.id
+                LEFT JOIN users u ON t.assignee_id = u.id
                 LEFT JOIN users c ON t.creator_id = c.id
                 WHERE t.group_id = $1
                 ORDER BY t.created_at DESC
@@ -102,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // 插入新任务
             try {
                 const insertRes = await db.query(`
-                INSERT INTO tasks (group_id, title, description, assigned_to, creator_id, due_date, priority, status)
+                INSERT INTO tasks (group_id, title, description, assignee_id, creator_id, due_date, priority, status)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'todo')
                 RETURNING *
             `, [
