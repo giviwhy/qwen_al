@@ -28,6 +28,11 @@ const AdminPanel: React.FC = () => {
     const [showGlobalNotice, setShowGlobalNotice] = useState(false);
     const [globalNoticeForm, setGlobalNoticeForm] = useState({ title: '', content: '' });
 
+    // 多选待添加用户
+    const [multiAddUserIds, setMultiAddUserIds] = useState<string[]>([]);
+    // 当前小组内待指定组长ID
+    const [targetLeaderId, setTargetLeaderId] = useState<string>('');
+
     // 带Token请求封装
     const authFetch = async (url: string, options: RequestInit = {}) => {
         const token = localStorage.getItem('token');
@@ -57,10 +62,12 @@ const AdminPanel: React.FC = () => {
         setLoading(false);
     }, [user, router.isReady]);
 
-    // 切换小组自动加载组员
+    // 切换小组自动加载组员、清空多选状态
     useEffect(() => {
         if (selectedGroup) fetchCurrentGroupMember(selectedGroup);
         else setCurrentGroupMembers([]);
+        setMultiAddUserIds([]);
+        setTargetLeaderId('');
     }, [selectedGroup]);
 
     // 消息提示
@@ -95,6 +102,83 @@ const AdminPanel: React.FC = () => {
         if (res.ok) {
             const json = await res.json();
             setCurrentGroupMembers(json.data || []);
+        }
+    };
+
+    // 获取【已有组长】的用户ID列表（全局所有小组组长）
+    const getGlobalLeaderIds = () => {
+        return groups.map(g => g.leader_id).filter(Boolean) as string[];
+    };
+
+    // 获取【已加入任意小组】的用户ID
+    const getAllJoinedUserIds = () => {
+        const ids: string[] = [];
+        groups.forEach(g => {
+            g.member_ids?.forEach((uid: string) => ids.push(uid));
+            if (g.leader_id) ids.push(g.leader_id);
+        });
+        return [...new Set(ids)];
+    };
+
+    // 筛选：未加入任何小组，可添加的候选用户
+    const availableAddUsers = allUserList.filter(u => !getAllJoinedUserIds().includes(u.id));
+    // 筛选：当前小组内、且不是其他小组组长，可被指定为本组组长
+    const availableLeaderCandidates = currentGroupMembers.filter(u => !getGlobalLeaderIds().includes(u.id));
+
+    // 多选框切换待添加用户
+    const toggleMultiAddUser = (uid: string) => {
+        if (multiAddUserIds.includes(uid)) {
+            setMultiAddUserIds(multiAddUserIds.filter(id => id !== uid));
+        } else {
+            setMultiAddUserIds([...multiAddUserIds, uid]);
+        }
+    };
+
+    // 批量添加多选用户到小组
+    const batchAddMembers = async (groupId: string) => {
+        if (multiAddUserIds.length === 0) return showToast('请至少选择一名用户', 'error');
+        const res = await authFetch('/api/group/batch-add-member', {
+            method: 'POST',
+            body: JSON.stringify({ groupId, userIds: multiAddUserIds })
+        });
+        if (res.ok) {
+            await fetchCurrentGroupMember(groupId);
+            await fetchAllData();
+            setMultiAddUserIds([]);
+            showToast('批量添加组员成功');
+        } else showToast('添加失败，用户已存在或参数错误', 'error');
+    };
+
+    // 移除单个组员
+    const removeSingleMember = async (groupId: string, uid: string) => {
+        if (!confirm('确定将该用户移出小组？')) return;
+        const res = await authFetch('/api/group/remove-member', {
+            method: 'POST',
+            body: JSON.stringify({ groupId, userId: uid })
+        });
+        if (res.ok) {
+            await fetchCurrentGroupMember(groupId);
+            await fetchAllData();
+            showToast('组员已移出小组');
+        } else showToast('移除失败', 'error');
+    };
+
+    // 指定本组组长
+    const setGroupLeader = async (groupId: string) => {
+        if (!targetLeaderId) return showToast('请选择一名组员作为组长', 'error');
+        try {
+            const res = await authFetch('/api/group/set-leader', {
+                method: 'PUT',
+                body: JSON.stringify({ groupId, newLeaderId: targetLeaderId })
+            });
+            const json = await res.json();
+            if (!json.success) return showToast(json.msg || '设置组长失败', 'error');
+            await fetchAllData();
+            await fetchCurrentGroupMember(groupId);
+            setTargetLeaderId('');
+            showToast('组长设置完成');
+        } catch (err) {
+            showToast('网络请求异常', 'error');
         }
     };
 
@@ -137,36 +221,6 @@ const AdminPanel: React.FC = () => {
         } else showToast('删除失败', 'error');
     };
 
-    // 向小组添加用户
-    const addGroupMember = async (groupId: string, uid: string) => {
-        const res = await authFetch('/api/group/add-member', {
-            method: 'POST',
-            body: JSON.stringify({ groupId, userId: uid })
-        });
-        if (res.ok) {
-            await fetchCurrentGroupMember(groupId);
-            await fetchAllData();
-            showToast('成员添加成功');
-        } else showToast('添加失败，该用户已在小组内', 'error');
-    };
-
-    // 更换小组组长（修复catch语法：catch (err)）
-    const changeGroupLeader = async (groupId: string, uid: string) => {
-        try {
-            const res = await authFetch('/api/group/set-leader', {
-                method: 'PUT',
-                body: JSON.stringify({ groupId, newLeaderId: uid })
-            });
-            const json = await res.json();
-            if (!json.success) return showToast(json.msg || '操作失败', 'error');
-            await fetchAllData();
-            await fetchCurrentGroupMember(groupId);
-            showToast('组长更换完成');
-        } catch (err) {
-            showToast('网络请求异常', 'error');
-        }
-    };
-
     // 发送全站公告
     const sendGlobalNotice = async () => {
         const res = await authFetch('/api/admin/send-all-notice', {
@@ -184,7 +238,6 @@ const AdminPanel: React.FC = () => {
     const handleGroupChange = (gid: string) => {
         setSelectedGroup(gid);
         setMemberPanelId(null);
-        setCurrentGroupMembers([]);
     };
 
     if (loading || !router.isReady) return (
@@ -364,7 +417,7 @@ const AdminPanel: React.FC = () => {
                     }}>
                         <div>
                             <h2 style={{ margin: 0, fontSize: '20px', color: '#1d2129' }}>全部小组管理</h2>
-                            <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#86909c' }}>创建、编辑、删除小组，分配组员与组长权限</p>
+                            <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#86909c' }}>创建、编辑、删除小组，批量增减组员、指定组长</p>
                         </div>
                         <button onClick={() => setShowCreateGroup(true)} style={{
                             padding: '9px 18px',
@@ -520,7 +573,7 @@ const AdminPanel: React.FC = () => {
                                                 padding: '8px 10px',
                                                 border: '1px solid #dcdfe6',
                                                 borderRadius: '6px',
-                                                marginBottom: '8px',
+                                                marginBottom: '10px',
                                                 fontSize: '14px'
                                             }}
                                         />
@@ -534,7 +587,7 @@ const AdminPanel: React.FC = () => {
                                                 padding: '8px 10px',
                                                 border: '1px solid #dcdfe6',
                                                 borderRadius: '6px',
-                                                marginBottom: '10px',
+                                                marginBottom: '14px',
                                                 fontSize: '14px',
                                                 resize: 'none'
                                             }}
@@ -561,7 +614,7 @@ const AdminPanel: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* 组员管理面板 */}
+                                {/* 组员管理面板（核心改造：多选添加、删除成员、指定组长） */}
                                 {memberPanelId === group.id && (
                                     <div onClick={e => e.stopPropagation()} style={{
                                         marginTop: '16px',
@@ -570,23 +623,97 @@ const AdminPanel: React.FC = () => {
                                         borderRadius: '10px'
                                     }}>
                                         <h5 style={{ margin: '0 0 12px', fontSize: '15px' }}>组员权限管理</h5>
-                                        <p style={{ fontSize: '12px', margin: '6px 0' }}>添加用户</p>
-                                        <select style={{ width: '100%', padding: '6px', marginBottom: '10px' }} onChange={ev => { const uid = ev.target.value; if (uid) addGroupMember(group.id, uid); }}>
-                                            <option value="">选择用户加入</option>
-                                            {allUserList?.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
-                                        </select>
-                                        <p style={{ fontSize: '12px', margin: '6px 0' }}>更换组长</p>
-                                        <select style={{ width: '100%', padding: '6px', marginBottom: '10px' }} onChange={ev => { const uid = ev.target.value; if (uid) changeGroupLeader(group.id, uid); }}>
-                                            <option value="">选择本组成员</option>
-                                            {currentGroupMembers?.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
-                                        </select>
-                                        <button onClick={() => setMemberPanelId(null)} style={{ width: '100%', padding: '6px' }}>关闭</button>
+
+                                        {/* 区域1：批量多选添加组员（过滤已入组/其他组长） */}
+                                        <div style={{ marginBottom: '16px' }}>
+                                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>批量添加组员（仅未加入任何小组用户可选）</p>
+                                            <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px #ddd solid', padding: '8px', borderRadius: '6px', background: '#fff' }}>
+                                                {availableAddUsers.length === 0
+                                                    ? <p style={{ color: '#999', fontSize: '13px' }}>暂无可添加用户，所有用户已分配至小组</p>
+                                                    : availableAddUsers.map(u => (
+                                                        <label key={u.id} style={{ display: 'block', fontSize: '13px', margin: '4px 0' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={multiAddUserIds.includes(u.id)}
+                                                                onChange={() => toggleMultiAddUser(u.id)}
+                                                                style={{ marginRight: '6px' }}
+                                                            />
+                                                            {u.username}
+                                                        </label>
+                                                    ))
+                                                }
+                                            </div>
+                                            <button
+                                                onClick={() => batchAddMembers(group.id)}
+                                                style={{ marginTop: '10px', width: '100%', padding: '7px', border: 'none', borderRadius: '6px', background: '#00b42a', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                                            >
+                                                确认批量添加选中用户
+                                            </button>
+                                        </div>
+
+                                        {/* 区域2：当前小组全部组员，支持移除 */}
+                                        <div style={{ marginBottom: '16px' }}>
+                                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>本小组现有成员（可移出）</p>
+                                            <div style={{ maxHeight: '140px', overflowY: 'auto', border: '1px #ddd solid', padding: '8px', borderRadius: '6px', background: '#fff' }}>
+                                                {currentGroupMembers.length === 0
+                                                    ? <p style={{ color: '#999', fontSize: '13px' }}>小组暂无成员</p>
+                                                    : currentGroupMembers.map(u => (
+                                                        <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '4px 0' }}>
+                                                            <span>{u.username}</span>
+                                                            <button
+                                                                onClick={() => removeSingleMember(group.id, u.id)}
+                                                                style={{ fontSize: '12px', padding: '2px 6px', background: '#f53f3f', color: '#fff', border: 0, borderRadius: '4px', cursor: 'pointer' }}
+                                                            >移出</button>
+                                                        </div>
+                                                    ))
+                                                }
+                                            </div>
+                                        </div>
+
+                                        {/* 区域3：指定本组组长（过滤其他小组组长） */}
+                                        <div style={{ marginBottom: '16px' }}>
+                                            <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#666' }}>设置本组组长（已担任其他小组组长的用户不可选）</p>
+                                            <select
+                                                style={{ width: '100%', padding: '8px 10px', border: '1px solid #dcdfe6', borderRadius: '6px', fontSize: '14px', marginBottom: '10px' }}
+                                                value={targetLeaderId}
+                                                onChange={e => setTargetLeaderId(e.target.value)}
+                                            >
+                                                <option value="">-- 选择组员作为本组组长 --</option>
+                                                {availableLeaderCandidates.map(u => (
+                                                    <option key={u.id} value={u.id}>{u.username}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                onClick={() => setGroupLeader(group.id)}
+                                                style={{ width: '100%', padding: '7px', border: 'none', borderRadius: '6px', background: '#1677ff', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                                            >
+                                                确认设为本组组长
+                                            </button>
+                                        </div>
+
+                                        <button onClick={() => setMemberPanelId(null)} style={{
+                                            width: '100%',
+                                            padding: '7px',
+                                            border: '1px solid #dcdfe6',
+                                            borderRadius: '6px',
+                                            background: '#fff',
+                                            cursor: 'pointer',
+                                            fontSize: '13px'
+                                        }}>关闭管理面板</button>
                                     </div>
                                 )}
                             </div>
                         ))}
                     </div>
-                    {groups?.length === 0 && <p style={{ textAlign: "center", padding: "3rem", color: "#888" }}>暂无小组，请点击上方新建</p>}
+
+                    {groups?.length === 0 && (
+                        <div style={{
+                            padding: '60px 0',
+                            textAlign: 'center',
+                            color: '#86909c',
+                            fontSize: '15px'
+                        }}>暂无任何小组，点击上方「新建小组」创建第一个小组</div>
+                    )}
                 </div>
             </div>
         </div>
