@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppProps } from 'next/app';
+import type { AppProps } from 'next/app';
 import { AuthProvider } from '../context/AuthContext';
 import '../styles/globals.css';
 
