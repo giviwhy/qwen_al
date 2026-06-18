@@ -15,21 +15,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     let loginUserId: string;
+    let loginRole: string;
     try {
         const payload = jwt.verify(token, secret) as { id: string; role: string };
         loginUserId = payload.id;
-    } catch (err) {                          // ← 补上 {
+        loginRole = payload.role;
+    } catch (err) {
         console.error('Token错误', err);
         return res.status(401).json({ success: false, msg: '登录失效', data: [] });
     }
 
-    // GET 查询任务
-    if (req.method === 'GET') {
-        const { groupId } = req.query;
-        const gid = Array.isArray(groupId) ? groupId[0] : groupId;
-        if (!gid) {
-            return res.status(400).json({ success: false, msg: '缺少groupId', data: [] });
+    const { groupId } = req.query;
+    const gid = Array.isArray(groupId) ? groupId[0] : groupId;
+    if (!gid) {
+        return res.status(400).json({ success: false, msg: '缺少groupId', data: [] });
+    }
+
+    // ====================== 统一权限校验：是否admin 或 本组组长 ======================
+    let isAdmin = loginRole === 'admin';
+    let isGroupLeader = false;
+    try {
+        const groupRow = await db.query(`SELECT leader_id FROM groups WHERE id = $1`, [gid]);
+        if (groupRow.rows.length === 0) {
+            return res.status(404).json({ success: false, msg: '小组不存在', data: [] });
         }
+        isGroupLeader = groupRow.rows[0].leader_id === loginUserId;
+    } catch (e) {
+        console.error('校验小组权限失败', e);
+        return res.status(500).json({ success: false, msg: '权限校验异常', data: [] });
+    }
+
+    // 既不是超级管理员，也不是本组组长，直接拦截
+    if (!isAdmin && !isGroupLeader) {
+        return res.status(403).json({ success: false, msg: '无权限操作该小组任务', data: [] });
+    }
+
+    // GET 查询本组任务
+    if (req.method === 'GET') {
         try {
             const result = await db.query(`
                 SELECT t.*, u.username as assignee_name, c.username as creator_name
@@ -48,18 +70,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // POST 创建任务
     if (req.method === 'POST') {
-        const { groupId, title, description, assignedTo, dueDate, priority } = req.body;
-        const gid = String(groupId).trim();
-        const taskTitle = String(title).trim();
-        if (!gid || !taskTitle) {
-            return res.status(400).json({ success: false, msg: '小组ID、标题必填' });
+        const { title, description, assignedTo, dueDate, priority } = req.body;
+        const taskTitle = String(title || '').trim();
+        if (!taskTitle) {
+            return res.status(400).json({ success: false, msg: '标题必填' });
         }
+
+        // 校验：分配人必须属于该小组组员
+        if (assignedTo) {
+            const memberCheck = await db.query(
+                `SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2`,
+                [gid, assignedTo]
+            );
+            if (memberCheck.rows.length === 0) {
+                return res.status(400).json({ success: false, msg: '仅可分配本组内成员' });
+            }
+        }
+
         try {
             const insertRes = await db.query(`
                 INSERT INTO tasks (group_id, title, description, assigned_to, creator_id, due_date, priority, status)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'todo')
                 RETURNING *
-            `, [gid, taskTitle, description || null, assignedTo || null, loginUserId, dueDate || null, priority || 'medium']);
+            `, [
+                gid,
+                taskTitle,
+                description || null,
+                assignedTo || null,
+                loginUserId,
+                dueDate || null,
+                priority || 'medium'
+            ]);
             return res.status(201).json({ success: true, msg: '创建成功', data: insertRes.rows[0] });
         } catch (e) {
             console.error('创建任务失败', e);
