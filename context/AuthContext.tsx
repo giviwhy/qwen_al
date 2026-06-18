@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, AuthContextType } from '../types';
+import { useRouter } from 'next/router';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const router = useRouter();
 
     // 页面刷新拉取登录态
     useEffect(() => {
@@ -17,7 +19,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
                 const result = await res.json();
                 if (res.ok && result.success) {
-                    // 取 result.data 真实用户对象
                     setUser(result.data);
                 } else {
                     localStorage.removeItem('token');
@@ -40,6 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (response.ok && data.success) {
             localStorage.setItem('token', data.data.token);
             setUser(data.data.user);
+            // 登录成功按角色自动跳转
+            if (data.data.user.role === 'admin') {
+                router.push('/admin');
+            } else {
+                router.push('/dashboard');
+            }
             return true;
         }
         return false;
@@ -58,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = () => {
         localStorage.removeItem('token');
         setUser(null);
+        router.push('/login');
     };
 
     return (

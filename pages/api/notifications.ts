@@ -55,10 +55,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ORDER BY n.created_at DESC
         `, [userId]);
 
+        // 关键优化：兜底空数组，防止rows为null传给前端
         return res.status(200).json({
             success: true,
             msg: '通知查询成功',
-            data: result.rows
+            data: result.rows || []
         });
     } catch (dbErr) {
         console.error('查询通知数据库异常：', dbErr);

@@ -50,18 +50,20 @@ const AdminPanel: React.FC = () => {
         return res;
     };
 
-    // 权限校验：非管理员强制跳转
+    // 权限校验：非管理员强制跳转【修复：等待数据加载完成再关闭loading】
     useEffect(() => {
         if (!router.isReady) return;
-        setLoading(true);
-        if (!user) {
-            router.push('/login');
-        } else if (user.role !== 'admin') {
-            router.push('/dashboard');
-        } else {
-            fetchAllData();
-        }
-        setLoading(false);
+        const init = async () => {
+            setLoading(true);
+            if (!user) {
+                router.push('/login');
+            } else if (user.role !== 'admin') {
+                router.push('/dashboard');
+            }
+            await fetchAllData();
+            setLoading(false);
+        };
+        init();
     }, [user, router.isReady]);
 
     // 切换小组自动加载组员、清空多选状态
@@ -180,14 +182,18 @@ const AdminPanel: React.FC = () => {
         }
     };
 
-    // 新建小组
+    // 新建小组【修复：await等待刷新，自动选中新小组】
     const submitCreateGroup = async () => {
         const res = await authFetch('/api/create-group', {
             method: 'POST',
             body: JSON.stringify(newGroupForm)
         });
         if (res.ok) {
-            fetchAllData();
+            await fetchAllData();
+            // 自动选中最新创建的小组
+            if (groups.length > 0) {
+                setSelectedGroup(groups[groups.length - 1].id);
+            }
             setShowCreateGroup(false);
             setNewGroupForm({ name: '', description: '' });
             showToast('小组创建成功');
@@ -201,7 +207,7 @@ const AdminPanel: React.FC = () => {
             body: JSON.stringify(editGroupForm)
         });
         if (res.ok) {
-            fetchAllData();
+            await fetchAllData();
             setEditGroupId(null);
             showToast('小组信息更新成功');
         } else showToast('更新失败', 'error');
@@ -214,7 +220,7 @@ const AdminPanel: React.FC = () => {
         const res = await authFetch(`/api/group/${gid}`, { method: 'DELETE' });
         if (res.ok) {
             if (selectedGroup === gid) setSelectedGroup(null);
-            fetchAllData();
+            await fetchAllData();
             showToast('小组已删除');
         } else showToast('删除失败', 'error');
     };

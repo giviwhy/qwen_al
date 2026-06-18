@@ -26,7 +26,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let userId: string;
     try {
         // 解析token拿到当前登录用户ID
-        const payload = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
+        const secret = process.env.JWT_SECRET;
+        if (!secret) throw new Error('JWT密钥未配置');
+        const payload = jwt.verify(token, secret) as { id: string };
         userId = payload.id;
     } catch (err) {
         console.error('Token解析失败：', err);
@@ -38,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-        // 关联组员表，只返回当前用户加入过的小组（符合业务逻辑）
+        // 关联组员表，只返回当前用户加入过的小组
         const sql = `
             SELECT DISTINCT g.*, u.username AS leader_name
             FROM groups g
@@ -52,11 +54,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json({
             success: true,
             msg: '查询成功',
-            data: result.rows
+            data: result.rows || [] // 兜底空数组，防止null
         });
     } catch (dbErr) {
         console.error('查询小组数据库异常：', dbErr);
-        // 数据库错误单独返回500，和401登录失效区分开
         return res.status(500).json({
             success: false,
             msg: '服务器查询小组数据失败',
