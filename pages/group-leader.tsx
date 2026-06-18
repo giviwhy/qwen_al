@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/router';
+import NotifyBell from '../components/NotifyBell';
 
 type GroupItem = {
     id: string;
@@ -21,7 +22,7 @@ type TaskItem = {
     description: string | null;
     assignee_name: string;
     creator_name: string;
-    assigned_to: string;
+    assignee_id: string; // 修复字段名
     status: string;
     priority: string;
     due_date: string | null;
@@ -80,6 +81,7 @@ export default function GroupLeaderPage() {
                 const res = await fetch(`/api/user-leader-groups`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+                if (!res.ok) throw new Error('小组接口访问失败');
                 const data = await res.json();
                 if (data.success) setMyGroups(data.data);
                 if (data.msg === "未登录") router.push('/login');
@@ -105,6 +107,7 @@ export default function GroupLeaderPage() {
                 const memRes = await fetch(`/api/group-members?groupId=${activeGroupId}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+                if (!memRes.ok) throw new Error('组员接口访问失败');
                 const memData = await memRes.json();
                 if (memData.success) {
                     setMembers(memData.data);
@@ -117,6 +120,7 @@ export default function GroupLeaderPage() {
                 const taskRes = await fetch(`/api/group/${activeGroupId}/tasks`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+                if (!taskRes.ok) throw new Error('任务接口访问失败');
                 const taskData = await taskRes.json();
                 if (taskData.success) {
                     setTaskList(taskData.data);
@@ -144,6 +148,7 @@ export default function GroupLeaderPage() {
             const res = await fetch(`/api/group/${activeGroupId}/tasks`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            if (!res.ok) throw new Error('刷新接口异常');
             const data = await res.json();
             if (data.success) setTaskList(data.data);
             if (data.msg === "未登录") router.push('/login');
@@ -178,6 +183,7 @@ export default function GroupLeaderPage() {
                     priority
                 })
             });
+            if (!res.ok) throw new Error('发布任务接口异常');
             const data = await res.json();
             alert(data.msg);
             if (data.success) {
@@ -200,7 +206,7 @@ export default function GroupLeaderPage() {
         setEditTask(task);
         setTaskTitle(task.title);
         setTaskDesc(task.description || '');
-        setAssignUserId(task.assigned_to);
+        setAssignUserId(task.assignee_id); // 修复字段
         setDueDate(task.due_date || '');
         setPriority(task.priority as 'low' | 'medium' | 'high');
         setEditOpen(true);
@@ -232,6 +238,7 @@ export default function GroupLeaderPage() {
                     priority
                 })
             });
+            if (!res.ok) throw new Error('编辑接口异常');
             const data = await res.json();
             alert(data.msg);
             if (data.success) {
@@ -263,6 +270,7 @@ export default function GroupLeaderPage() {
                 },
                 body: JSON.stringify({ taskId: tid })
             });
+            if (!res.ok) throw new Error('删除接口异常');
             const data = await res.json();
             alert(data.msg);
             if (data.success) refreshTasks();
@@ -281,7 +289,9 @@ export default function GroupLeaderPage() {
         <div className="max-w-7xl mx-auto p-6">
             <div className="flex justify-between items-center mb-8">
                 <h1 className="text-2xl font-bold">组长管理后台</h1>
-                <div className="flex gap-4">
+                {/* 通知铃铛放置顶部导航 */}
+                <div className="flex items-center gap-4">
+                    <NotifyBell />
                     <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-gray-200 rounded">返回工作台</button>
                     <button onClick={logout} className="px-4 py-2 bg-red-500 text-white rounded text-white">退出登录</button>
                 </div>
