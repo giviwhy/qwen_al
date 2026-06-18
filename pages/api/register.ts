@@ -32,9 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // 3. 密码加密
         const hashPwd = await bcrypt.hash(pwd, 10);
 
-        // 4. 插入用户，修正字段 password → password_hash，默认角色 member
+        // 4. 插入用户，把 password_hash 改成 password
         const insertRes = await db.query(
-            `INSERT INTO users (username, email, password_hash, role) 
+            `INSERT INTO users (username, email, password, role) 
              VALUES ($1,$2,$3,$4) 
              RETURNING id, username, email, role`,
             [uname, mail, hashPwd, 'member']

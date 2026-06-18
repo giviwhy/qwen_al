@@ -34,8 +34,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
         }
 
-        // 校验密码
-        const passOk = await bcrypt.compare(password, user.password_hash);
+        // 拦截password为空，避免bcrypt第二个参数undefined报错
+        if (!user.password) {
+            return res.status(401).json({
+                success: false,
+                msg: '账户密码异常，请联系管理员重置密码'
+            });
+        }
+
+        // 密码比对，字段名改为password
+        const passOk = await bcrypt.compare(password, user.password);
         if (!passOk) {
             console.warn(`用户${username}密码输入错误`);
             return res.status(401).json({
@@ -44,14 +52,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
         }
 
-        // 生成7天有效期token
+        // 生成7天token
         const token = jwt.sign(
             { id: user.id, username: user.username, role: user.role },
             process.env.JWT_SECRET!,
             { expiresIn: '7d' }
         );
 
-        // 标准成功返回格式，和项目所有接口统一
         return res.status(200).json({
             success: true,
             msg: '登录成功',

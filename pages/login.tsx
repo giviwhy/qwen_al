@@ -7,7 +7,6 @@ export default function LoginPage() {
     const router = useRouter();
     const { user } = useAuth();
 
-    // 已登录直接跳看板
     React.useEffect(() => {
         if (user) {
             router.push('/dashboard');
@@ -15,8 +14,10 @@ export default function LoginPage() {
     }, [user, router]);
 
     return (
-        <div style={{ maxWidth: 450, margin: '6rem auto', padding: '0 20px' }}>
-            <LoginForm />
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-16">
+            <div className="w-full max-w-md">
+                <LoginForm />
+            </div>
         </div>
     );
 }

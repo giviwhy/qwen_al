@@ -18,8 +18,12 @@ const LoginForm: React.FC = () => {
       if (success) {
         alert('注册成功！请登录');
         setIsRegistering(false);
+        // 清空输入框
+        setUsername('');
+        setEmail('');
+        setPassword('');
       } else {
-        alert('注册失败，请重试');
+        alert('注册失败，用户名/邮箱已存在');
       }
     } else {
       const success = await login(username, password);
@@ -32,45 +36,62 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="login-container">
-      <h2>{isRegistering ? '注册账号' : '系统登录'}</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>用户名：</label>
+    <div className="login-container border border-gray-200 rounded-xl shadow-lg bg-white p-8 w-full">
+      <h2 className="text-center text-2xl font-bold text-gray-800 mb-6">
+        {isRegistering ? '注册账号' : '系统登录'}
+      </h2>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm text-gray-600 font-medium">用户名</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
+            className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+            placeholder="请输入用户名"
           />
         </div>
+
         {isRegistering && (
-          <div>
-            <label>邮箱：</label>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm text-gray-600 font-medium">邮箱</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+              placeholder="请输入邮箱"
             />
           </div>
         )}
-        <div>
-          <label>密码：</label>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-sm text-gray-600 font-medium">密码</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+            placeholder="请输入密码"
           />
         </div>
-        <button type="submit">{isRegistering ? '注册' : '登录'}</button>
+
+        <button
+          type="submit"
+          className="mt-2 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+        >
+          {isRegistering ? '立即注册' : '登录'}
+        </button>
       </form>
-      <p style={{ marginTop: 12, textAlign: 'center' }}>
+
+      <p className="mt-6 text-center text-sm text-gray-500">
         {isRegistering ? '已有账号？' : '没有账号？'}{' '}
         <button
           type="button"
-          style={{ background: 'transparent', border: 'none', color: '#0070f3', cursor: 'pointer' }}
+          className="text-blue-500 hover:text-blue-600 bg-transparent border-none cursor-pointer font-medium"
           onClick={() => setIsRegistering(!isRegistering)}
         >
           {isRegistering ? '去登录' : '去注册'}
@@ -80,5 +101,4 @@ const LoginForm: React.FC = () => {
   );
 };
 
-// 关键：底部默认导出，匹配 login.tsx 的 import LoginForm from
 export default LoginForm;
