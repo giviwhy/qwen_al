@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Group, Task, Notification } from '../types';
-
+import { useRouter } from 'next/router';
 const Dashboard: React.FC = () => {
-    const { user, logout } = useAuth();
     const [groups, setGroups] = useState<Group[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-
+    const { user, logout } = useAuth();
+    const router = useRouter();
+    useEffect(() => {
+        if (!user) {
+            router.push('/login');
+        }
+    }, [user, router]);
     useEffect(() => {
         if (user) {
             fetchData();
         }
     }, [user, selectedGroup]);
-
     const fetchData = async () => {
         if (!user) return;
 
@@ -58,10 +62,6 @@ const Dashboard: React.FC = () => {
     const handleGroupChange = (groupId: string) => {
         setSelectedGroup(groupId);
     };
-
-    if (!user) {
-        return <div>Please log in</div>;
-    }
 
     return (
         <div className="dashboard">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useRouter } from 'next/router'; // 新增路由
 
 const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -7,6 +8,7 @@ const LoginForm: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const { login, register } = useAuth();
+  const router = useRouter(); // 路由实例
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +23,10 @@ const LoginForm: React.FC = () => {
       }
     } else {
       const success = await login(username, password);
-      if (!success) {
+      if (success) {
+        // 登录成功跳转看板
+        router.push('/dashboard');
+      } else {
         alert('Login failed. Please check your credentials.');
       }
     }
@@ -77,7 +82,7 @@ const LoginForm: React.FC = () => {
       </form>
       <p>
         {isRegistering ? 'Already have an account?' : "Don't have an account?"}{' '}
-        <button onClick={() => setIsRegistering(!isRegistering)}>
+        <button type="button" onClick={() => setIsRegistering(!isRegistering)}>
           {isRegistering ? 'Login' : 'Register'}
         </button>
       </p>
