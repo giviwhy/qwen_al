@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Group, User } from '../types';
 import { useRouter } from 'next/router';
+import NotifyBell from '../components/NotifyBell';
 
 const AdminPanel: React.FC = () => {
     const [groups, setGroups] = useState<Group[]>([]);
@@ -225,9 +226,9 @@ const AdminPanel: React.FC = () => {
         } else showToast('删除失败', 'error');
     };
 
-    // 发送全站公告
+    // 发送全站公告（修复接口路径，匹配publish-notify.ts）
     const sendGlobalNotice = async () => {
-        const res = await authFetch('/api/admin/send-all-notice', {
+        const res = await authFetch('/api/admin/publish-notify', {
             method: 'POST',
             body: JSON.stringify(globalNoticeForm)
         });
@@ -281,7 +282,7 @@ const AdminPanel: React.FC = () => {
                 </div>
             )}
 
-            {/* 页面头部导航栏 */}
+            {/* 页面头部导航栏（新增通知铃铛） */}
             <header style={{
                 maxWidth: '1280px',
                 margin: '0 auto 32px',
@@ -293,7 +294,8 @@ const AdminPanel: React.FC = () => {
                     <h1 style={{ margin: 0, fontSize: '24px', color: '#1d2129' }}>管理员后台管理面板</h1>
                     <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#86909c' }}>统一管理全部小组、成员与全站公告</p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <NotifyBell />
                     <button onClick={() => router.push('/dashboard')} style={{
                         padding: '8px 16px',
                         border: '1px solid #dcdfe6',
