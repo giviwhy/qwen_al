@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
-import db from '../../lib/db';
+import db from '../../../lib/db';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'PUT') return res.status(405).end();
