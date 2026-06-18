@@ -8,6 +8,7 @@ const Dashboard: React.FC = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [allUserList, setAllUserList] = useState<User[]>([]);
+    const [currentGroupMembers, setCurrentGroupMembers] = useState<User[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const { user, logout } = useAuth();
@@ -43,22 +44,37 @@ const Dashboard: React.FC = () => {
         }
     }, [user, router]);
 
-    // 用户登录后拉取小组、通知、管理员拉取全部用户
+    // 登录后加载数据 + 选中小组时加载本组成员
     useEffect(() => {
         if (user) {
             fetchData();
             if (user.role === 'admin') fetchAllUsers();
         }
-    }, [user, selectedGroup]);
+    }, [user]);
+
+    useEffect(() => {
+        if (selectedGroup) {
+            fetchCurrentGroupMember(selectedGroup);
+        } else {
+            setCurrentGroupMembers([]);
+        }
+    }, [selectedGroup]);
 
     if (!user) return <div>加载中...</div>;
 
-    // 获取全部系统用户（管理员组员下拉使用）
+    // 获取全部系统用户（管理员添加新成员用）
     const fetchAllUsers = async () => {
         const res = await authFetch('/api/users');
         if (res.ok) setAllUserList(await res.json());
     };
 
+    // 获取当前选中小组内部成员
+    const fetchCurrentGroupMember = async (gid: string) => {
+        const res = await authFetch(`/api/group-members?groupId=${gid}`);
+        if (res.ok) setCurrentGroupMembers(await res.json());
+    };
+
+    // 加载小组、通知基础数据
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -89,7 +105,7 @@ const Dashboard: React.FC = () => {
         setSelectedGroup(groupId);
     };
 
-    // 创建小组提交
+    // 创建小组
     const submitCreateGroup = async () => {
         const res = await authFetch('/api/create-group', {
             method: 'POST',
@@ -122,16 +138,17 @@ const Dashboard: React.FC = () => {
         if (res.ok) fetchData();
     };
 
-    // 添加组员到小组
+    // 添加组员（全用户下拉，可拉外部人）
     const addGroupMember = async (groupId: string, uid: string) => {
         await authFetch('/api/group/add-member', {
             method: 'POST',
             body: JSON.stringify({ groupId, userId: uid })
         });
         alert('添加组员成功');
+        fetchCurrentGroupMember(groupId);
     };
 
-    // 修改小组组长
+    // 修改组长：仅允许选择本组内成员
     const changeGroupLeader = async (groupId: string, uid: string) => {
         await authFetch('/api/group/set-leader', {
             method: 'PUT',
@@ -159,70 +176,70 @@ const Dashboard: React.FC = () => {
         <div className="dashboard">
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1>团队协作任务看板</h1>
-                <div className="user-info" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div className="user-info" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <span>欢迎你，{user.username}（{user.role === 'admin' ? '管理员' : user.role === 'leader' ? '组长' : '普通成员'}）</span>
                     {user.role === 'admin' && (
-                        <button onClick={() => setShowGlobalNotice(true)}>群发全站通知</button>
+                        <button style={{ padding: '6px 10px', cursor: 'pointer' }} onClick={() => setShowGlobalNotice(true)}>群发全站通知</button>
                     )}
-                    <button onClick={logout}>退出登录</button>
+                    <button style={{ padding: '6px 10px', cursor: 'pointer' }} onClick={logout}>退出登录</button>
                 </div>
             </header>
 
-            {/* 管理员全局通知弹窗 */}
+            {/* 全站公告弹窗 优化宽高排版 */}
             {showGlobalNotice && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-                    <div style={{ background: '#fff', padding: 20, width: 420 }}>
-                        <h3>发布全站公告</h3>
+                    <div style={{ background: '#fff', padding: '24px', width: '460px', borderRadius: '8px' }}>
+                        <h3 style={{ marginBottom: '16px' }}>发布全站公告</h3>
                         <input
                             placeholder="通知标题"
                             value={globalNoticeForm.title}
                             onChange={e => setGlobalNoticeForm({ ...globalNoticeForm, title: e.target.value })}
-                            style={{ width: '100%', margin: '8px 0', padding: 8 }}
+                            style={{ width: '100%', margin: '8px 0', padding: '10px', border: '1px #ddd solid', borderRadius: '4px' }}
                         />
                         <textarea
                             placeholder="通知内容"
                             value={globalNoticeForm.content}
                             onChange={e => setGlobalNoticeForm({ ...globalNoticeForm, content: e.target.value })}
-                            rows={4}
-                            style={{ width: '100%', marginBottom: 12, padding: 8 }}
+                            rows={5}
+                            style={{ width: '100%', marginBottom: '16px', padding: '10px', border: '1px #ddd solid', borderRadius: '4px' }}
                         />
-                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                            <button onClick={() => setShowGlobalNotice(false)}>取消</button>
-                            <button onClick={sendGlobalNotice}>发送公告</button>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button style={{ padding: '8px 16px' }} onClick={() => setShowGlobalNotice(false)}>取消</button>
+                            <button style={{ padding: '8px 16px', background: '#0070f3', color: '#fff', border: 0, borderRadius: '4px' }} onClick={sendGlobalNotice}>发送公告</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            <main style={{ display: 'flex', gap: '1rem', marginTop: 16 }}>
+            <main style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
                 <aside style={{ width: '240px' }}>
-                    <h2>我的小组</h2>
+                    <h2 style={{ marginBottom: '12px' }}>我的小组</h2>
                     {/* 管理员创建小组按钮 */}
                     {user.role === 'admin' && (
                         <>
                             <button
                                 onClick={() => setShowCreateGroup(true)}
-                                style={{ marginBottom: 10, padding: '6px 10px', cursor: 'pointer', width: '100%' }}
+                                style={{ marginBottom: '12px', padding: '8px 10px', cursor: 'pointer', width: '100%' }}
                             >
                                 + 新建小组
                             </button>
                             {/* 新建小组弹窗 */}
                             {showCreateGroup && (
-                                <div style={{ border: '1px solid #ccc', padding: 12, marginBottom: 10 }}>
-                                    <h4>创建新小组</h4>
+                                <div style={{ border: '1px #ccc solid', padding: '16px', marginBottom: '12px', borderRadius: '6px' }}>
+                                    <h4 style={{ marginBottom: '12px' }}>创建新小组</h4>
                                     <input
                                         placeholder="请输入小组名称"
                                         value={newGroupForm.name}
                                         onChange={(e) => setNewGroupForm({ ...newGroupForm, name: e.target.value })}
-                                        style={{ display: 'block', margin: '6px 0', width: '100%' }}
+                                        style={{ display: 'block', margin: '8px 0', width: '100%', padding: '8px' }}
                                     />
                                     <textarea
                                         placeholder="小组描述（选填）"
                                         value={newGroupForm.description}
                                         onChange={(e) => setNewGroupForm({ ...newGroupForm, description: e.target.value })}
-                                        style={{ display: 'block', margin: '6px 0', width: '100%' }}
+                                        style={{ display: 'block', margin: '8px 0', width: '100%', padding: '8px' }}
                                     />
-                                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                                         <button onClick={submitCreateGroup}>确认创建</button>
                                         <button onClick={() => setShowCreateGroup(false)}>取消</button>
                                     </div>
@@ -237,28 +254,28 @@ const Dashboard: React.FC = () => {
                                 key={group.id}
                                 className={`group-item ${selectedGroup === group.id ? 'active' : ''}`}
                                 onClick={() => handleGroupChange(group.id)}
-                                style={{ padding: '8px', border: '1px solid #ccc', marginBottom: 6, cursor: 'pointer' }}
+                                style={{ padding: '12px', border: '1px #ccc solid', marginBottom: '8px', cursor: 'pointer', borderRadius: '6px' }}
                             >
-                                <h3>{group.name}</h3>
-                                <p>{group.description || '暂无描述'}</p>
+                                <h3 style={{ marginBottom: '6px' }}>{group.name}</h3>
+                                <p style={{ fontSize: '13px', marginBottom: '6px' }}>{group.description || '暂无描述'}</p>
                                 <small>组长：{group.leader_name ?? '暂无组长'}</small>
 
-                                {/* 管理员全套操作按钮：编辑、删除、组员管理 */}
+                                {/* 管理员操作按钮 */}
                                 {user.role === 'admin' && (
-                                    <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    <div style={{ marginTop: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setEditGroupId(group.id);
                                                 setEditGroupForm({ name: group.name, description: group.description || '' });
                                             }}
-                                            style={{ fontSize: 12 }}
+                                            style={{ fontSize: '12px', padding: '4px 6px' }}
                                         >
                                             编辑
                                         </button>
                                         <button
                                             onClick={(e) => deleteGroup(group.id, e)}
-                                            style={{ fontSize: 12, color: 'red' }}
+                                            style={{ fontSize: '12px', padding: '4px 6px', color: '#fff', background: '#e74c3c', border: 0, borderRadius: '3px' }}
                                         >
                                             删除
                                         </button>
@@ -267,7 +284,7 @@ const Dashboard: React.FC = () => {
                                                 e.stopPropagation();
                                                 setMemberPanelId(group.id);
                                             }}
-                                            style={{ fontSize: 12 }}
+                                            style={{ fontSize: '12px', padding: '4px 6px', background: '#2ecc71', color: '#fff', border: 0, borderRadius: '3px' }}
                                         >
                                             组员管理
                                         </button>
@@ -276,11 +293,11 @@ const Dashboard: React.FC = () => {
 
                                 {/* 组员管理弹窗 */}
                                 {memberPanelId === group.id && (
-                                    <div onClick={e => e.stopPropagation()} style={{ border: '1px solid #aaa', padding: 10, marginTop: 8 }}>
-                                        <h5>组员操作面板</h5>
-                                        <p style={{ fontSize: 12, margin: '4px 0' }}>添加成员：</p>
+                                    <div onClick={e => e.stopPropagation()} style={{ border: '1px #aaa solid', padding: '14px', marginTop: '10px', borderRadius: '6px' }}>
+                                        <h5 style={{ marginBottom: '10px' }}>组员操作面板</h5>
+                                        <p style={{ fontSize: '12px', margin: '4px 0' }}>添加新成员（全体用户）：</p>
                                         <select
-                                            style={{ width: '100%', marginBottom: 6 }}
+                                            style={{ width: '100%', marginBottom: '12px', padding: '6px' }}
                                             onChange={ev => {
                                                 const uid = ev.target.value;
                                                 if (uid) addGroupMember(group.id, uid);
@@ -291,37 +308,38 @@ const Dashboard: React.FC = () => {
                                                 <option key={u.id} value={u.id}>{u.username}</option>
                                             ))}
                                         </select>
-                                        <p style={{ fontSize: 12, margin: '4px 0' }}>更换本组组长：</p>
+
+                                        <p style={{ fontSize: '12px', margin: '4px 0' }}>更换组长（仅本组成员）：</p>
                                         <select
-                                            style={{ width: '100%', marginBottom: 8 }}
+                                            style={{ width: '100%', marginBottom: '12px', padding: '6px' }}
                                             onChange={ev => {
                                                 const uid = ev.target.value;
                                                 if (uid) changeGroupLeader(group.id, uid);
                                             }}
                                         >
-                                            <option value="">选择用户设为组长</option>
-                                            {allUserList.map(u => (
+                                            <option value="">选择本组成员设为组长</option>
+                                            {currentGroupMembers.map(u => (
                                                 <option key={u.id} value={u.id}>{u.username}</option>
                                             ))}
                                         </select>
-                                        <button onClick={() => setMemberPanelId(null)} style={{ width: '100%' }}>关闭</button>
+                                        <button style={{ width: '100%', padding: '6px' }} onClick={() => setMemberPanelId(null)}>关闭</button>
                                     </div>
                                 )}
 
                                 {/* 编辑小组弹窗 */}
                                 {editGroupId === group.id && (
-                                    <div onClick={e => e.stopPropagation()} style={{ border: '1px solid #aaa', padding: 8, marginTop: 6 }}>
+                                    <div onClick={e => e.stopPropagation()} style={{ border: '1px #aaa solid', padding: '14px', marginTop: '10px', borderRadius: '6px' }}>
                                         <input
                                             value={editGroupForm.name}
                                             onChange={(e) => setEditGroupForm({ ...editGroupForm, name: e.target.value })}
-                                            style={{ width: '100%', marginBottom: 4 }}
+                                            style={{ width: '100%', marginBottom: '8px', padding: '8px' }}
                                         />
                                         <textarea
                                             value={editGroupForm.description}
                                             onChange={(e) => setEditGroupForm({ ...editGroupForm, description: e.target.value })}
-                                            style={{ width: '100%', marginBottom: 4 }}
+                                            style={{ width: '100%', marginBottom: '12px', padding: '8px' }}
                                         />
-                                        <div style={{ display: 'flex', gap: 6 }}>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
                                             <button onClick={() => saveEditGroup(group.id)}>保存修改</button>
                                             <button onClick={() => setEditGroupId(null)}>取消</button>
                                         </div>
@@ -341,20 +359,20 @@ const Dashboard: React.FC = () => {
                 </section>
 
                 <aside className="notifications-panel" style={{ width: '280px' }}>
-                    <h2>消息通知</h2>
+                    <h2 style={{ marginBottom: '12px' }}>消息通知</h2>
                     <div className="notifications-list">
                         {notifications.length > 0 ? (
                             notifications.map(notification => (
                                 <div
                                     key={notification.id}
-                                    className={`notification ${notification.is_read ? 'read' : 'unread'}`}
-                                    style={{ padding: 8, borderBottom: '1px solid #eee' }}
+                                    className={`notification ${notification.is_read ? '' : 'unread'}`}
+                                    style={{ padding: '12px', borderBottom: '1px #eee solid', marginBottom: '8px' }}
                                 >
-                                    <h4>{notification.title}</h4>
-                                    <p>{notification.content}</p>
-                                    <small>
+                                    <h4 style={{ marginBottom: '6px' }}>{notification.title}</h4>
+                                    <p style={{ fontSize: '13px', marginBottom: '6px' }}>{notification.content}</p>
+                                    <small style={{ fontSize: '12px' }}>
                                         发送人：{notification.sender_name}
-                                        {!notification.group_id && <span style={{ color: '#f44336' }}>【全站公告】</span>}
+                                        {!notification.group_id && <span style={{ color: '#e74c3c', fontWeight: 'bold' }}>【全站公告】</span>}
                                         <br />
                                         {new Date(notification.created_at).toLocaleString()}
                                     </small>
@@ -443,10 +461,10 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch, userRole }) =
 
     return (
         <div className="group-view">
-            <h2>任务列表</h2>
-            {/* 仅组长展示新建任务表单，管理员/普通成员隐藏 */}
+            <h2 style={{ marginBottom: '16px' }}>任务列表</h2>
+            {/* 仅组长展示新建任务表单 */}
             {userRole === 'leader' ? (
-                <form onSubmit={handleCreateTask} className="create-task-form" style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <form onSubmit={handleCreateTask} className="create-task-form" style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <h3>新建任务</h3>
                     <input
                         type="text"
@@ -454,58 +472,62 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch, userRole }) =
                         value={newTask.title}
                         onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                         required
+                        style={{ padding: '8px' }}
                     />
                     <textarea
                         placeholder="任务描述（选填）"
                         value={newTask.description}
                         onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                        style={{ padding: '8px' }}
                     />
                     <select
                         value={newTask.assignedTo}
                         onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+                        style={{ padding: '8px' }}
                     >
                         <option value="">未分配成员</option>
-                        {/* 后续可填充当前小组成员 */}
                     </select>
                     <input
                         type="date"
                         value={newTask.dueDate}
                         onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                        style={{ padding: '8px' }}
                     />
                     <select
                         value={newTask.priority}
                         onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                        style={{ padding: '8px' }}
                     >
                         <option value="low">低优先级</option>
                         <option value="medium">中优先级</option>
                         <option value="high">高优先级</option>
                     </select>
-                    <button type="submit">提交创建任务</button>
+                    <button type="submit" style={{ padding: '10px', background: '#0070f3', color: '#fff', border: 0, borderRadius: '4px' }}>提交创建任务</button>
                 </form>
             ) : userRole === 'admin' ? (
-                <p style={{ color: '#666' }}>提示：管理员无任务发布权限，请将组员设置为本组组长后发布任务</p>
+                <p style={{ color: '#666', marginBottom: '16px' }}>提示：管理员无任务发布权限，请将组员设置为本组组长后发布任务</p>
             ) : null}
 
-            <div className="tasks-board" style={{ display: 'flex', gap: '0.8rem', overflowX: 'auto' }}>
-                <div className="task-column" style={{ minWidth: 220, border: '1px solid #eee', padding: 8 }}>
+            <div className="tasks-board" style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '10px' }}>
+                <div className="task-column" style={{ minWidth: '250px' }}>
                     <h3>待处理</h3>
                     {tasks.filter(t => t.status === 'todo').map(task => (
                         <TaskCard key={task.id} task={task} />
                     ))}
                 </div>
-                <div className="task-column" style={{ minWidth: 220, border: '1px solid #eee', padding: 8 }}>
+                <div className="task-column" style={{ minWidth: '250px' }}>
                     <h3>进行中</h3>
                     {tasks.filter(t => t.status === 'in-progress').map(task => (
                         <TaskCard key={task.id} task={task} />
                     ))}
                 </div>
-                <div className="task-column" style={{ minWidth: 220, border: '1px solid #eee', padding: 8 }}>
+                <div className="task-column" style={{ minWidth: '250px' }}>
                     <h3>待审核</h3>
                     {tasks.filter(t => t.status === 'review').map(task => (
                         <TaskCard key={task.id} task={task} />
                     ))}
                 </div>
-                <div className="task-column" style={{ minWidth: 220, border: '1px solid #eee', padding: 8 }}>
+                <div className="task-column" style={{ minWidth: '250px' }}>
                     <h3>已完成</h3>
                     {tasks.filter(t => t.status === 'done').map(task => (
                         <TaskCard key={task.id} task={task} />
@@ -523,15 +545,15 @@ interface TaskCardProps {
 const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
     const [showDetails, setShowDetails] = useState(false);
     return (
-        <div className="task-card" style={{ border: '1px solid #ddd', padding: 8, marginBottom: 6, borderRadius: 4 }}>
-            <div className="task-header" onClick={() => setShowDetails(!showDetails)} style={{ cursor: 'pointer' }}>
-                <h4 style={{ margin: 0 }}>{task.title}</h4>
-                <span className={`priority ${task.priority}`}>
+        <div className={`task-card priority-${task.priority}`} style={{ border: '1px #ddd solid', padding: '12px', marginBottom: '10px', borderRadius: '6px' }}>
+            <div onClick={() => setShowDetails(!showDetails)} style={{ cursor: 'pointer' }}>
+                <h4 style={{ marginBottom: '6px' }}>{task.title}</h4>
+                <span style={{ fontSize: '12px' }}>
                     {task.priority === 'low' ? '低' : task.priority === 'medium' ? '中' : '高'}优先级
                 </span>
             </div>
             {showDetails && (
-                <div className="task-details" style={{ marginTop: 6, fontSize: 14 }}>
+                <div style={{ marginTop: '10px', fontSize: '14px' }}>
                     <p><strong>任务描述：</strong>{task.description || '无'}</p>
                     <p><strong>负责人：</strong>{task.assignee_name || '未分配'}</p>
                     <p><strong>创建人：</strong>{task.creator_name}</p>
@@ -541,7 +563,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
                             : task.status === 'in-progress' ? '进行中'
                                 : task.status === 'review' ? '待审核' : '已完成'}
                     </p>
-                    {task.due_date && <p><strong>截止日期：</strong>{new Date(task.due_date).toLocaleDateString()}</p>}
+                    {task.due_date && <p><strong>截止日期：</strong>{task.due_date}</p>}
                 </div>
             )}
         </div>
