@@ -1,58 +1,143 @@
-* {
+/* 1. 全局样式重置 + 变量定义（提升复用性） */
+:root {
+  /* 颜色系统 */
+  --color-primary: #0070f3;
+  --color-primary-light: #e6f0ff;
+  --color-secondary: #2c3e50;
+  --color-success: #2ecc71;
+  --color-warning: #f39c12;
+  --color-danger: #e74c3c;
+  --color-gray-100: #f9f9f9;
+  --color-gray-200: #f5f5f5;
+  --color-gray-300: #eee;
+  --color-gray-400: #ddd;
+  --color-gray-500: #95a5a6;
+  --color-gray-600: #7f8c8d;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* 尺寸系统 */
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 0.8rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* 圆角/阴影 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.1);
+
+  /* 字体 */
+  --font-main: Arial, sans-serif;
+  --font-size-sm: 0.8rem;
+  --font-size-md: 0.9rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.2rem;
+}
+
+/* 2. 全局重置（更优雅的 reset，避免通配符过度影响） */
+html {
+  box-sizing: border-box;
+  font-size: 16px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 body {
-  font-family: Arial, sans-serif;
-  background-color: #f5f5f5;
+  font-family: var(--font-main);
+  background-color: var(--color-gray-200);
+  color: var(--color-secondary);
+  line-height: 1.5;
 }
 
+/* 3. 通用组件样式（复用性提升） */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-md);
+}
+
+.card {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.form-control {
+  width: 100%;
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-gray-400);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-xs);
+  font-size: var(--font-size-base);
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  transition: background-color 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.btn-primary:hover {
+  background-color: #005cc8;
+  /* 主色加深，提升交互反馈 */
+}
+
+/* 4. 登录模块（精简嵌套，复用变量） */
 .login-container {
   max-width: 400px;
   margin: 100px auto;
-  padding: 20px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: var(--spacing-xl);
+  background-color: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
 }
 
-.login-container form div {
-  margin-bottom: 15px;
+.login-form__group {
+  margin-bottom: var(--spacing-lg);
 }
 
-.login-container label {
+.login-form__label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: var(--spacing-xs);
   font-weight: bold;
 }
 
-.login-container input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.login-container button {
-  width: 100%;
-  padding: 10px;
-  background-color: #0070f3;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
+/* 5. 仪表盘模块（模块化拆分，减少嵌套） */
 .dashboard {
   min-height: 100vh;
 }
 
-.dashboard header {
-  background-color: #2c3e50;
-  color: white;
-  padding: 1rem;
+.dashboard__header {
+  background-color: var(--color-secondary);
+  color: var(--color-white);
+  padding: var(--spacing-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -61,141 +146,162 @@ body {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--spacing-md);
 }
 
-.dashboard main {
+.dashboard__main {
   display: flex;
   height: calc(100vh - 70px);
 }
 
-aside {
+/* 侧边栏 */
+.sidebar {
   width: 250px;
-  background-color: white;
-  padding: 1rem;
-  border-right: 1px solid #eee;
+  background-color: var(--color-white);
+  padding: var(--spacing-md);
+  border-right: 1px solid var(--color-gray-300);
   overflow-y: auto;
 }
 
-.groups-list .group-item {
-  padding: 1rem;
-  margin-bottom: 0.5rem;
-  border: 1px solid #eee;
-  border-radius: 4px;
+.groups-list__item {
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-xs);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.groups-list .group-item.active {
-  border-color: #0070f3;
-  background-color: #e6f0ff;
+.groups-list__item--active {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
 }
 
+/* 主内容区 */
 .main-content {
   flex: 1;
-  padding: 1rem;
+  padding: var(--spacing-md);
   overflow-y: auto;
 }
 
+/* 通知面板 */
 .notifications-panel {
   width: 300px;
-  background-color: white;
-  border-left: 1px solid #eee;
-  padding: 1rem;
+  background-color: var(--color-white);
+  border-left: 1px solid var(--color-gray-300);
+  padding: var(--spacing-md);
   overflow-y: auto;
 }
 
-.notifications-list .notification {
-  padding: 1rem;
-  margin-bottom: 0.5rem;
-  border: 1px solid #eee;
-  border-radius: 4px;
+.notification {
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-xs);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-sm);
 }
 
-.notifications-list .notification.unread {
+.notification--unread {
   background-color: #f0f8ff;
-  border-left: 4px solid #0070f3;
+  border-left: 4px solid var(--color-primary);
 }
 
-.group-view h2 {
-  margin-bottom: 1rem;
+/* 任务模块 */
+.group-view__title {
+  margin-bottom: var(--spacing-md);
 }
 
 .create-task-form {
-  background-color: white;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  margin-bottom: 1rem;
-}
-
-.create-task-form input,
-.create-task-form textarea,
-.create-task-form select {
-  width: 100%;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background-color: var(--color-white);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--spacing-md);
 }
 
 .tasks-board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
+  gap: var(--spacing-md);
 }
 
 .task-column {
-  background-color: #f9f9f9;
-  padding: 1rem;
-  border-radius: 8px;
+  background-color: var(--color-gray-100);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
 }
 
-.task-column h3 {
-  margin-bottom: 1rem;
+.task-column__title {
+  margin-bottom: var(--spacing-md);
   text-align: center;
-  color: #2c3e50;
+  color: var(--color-secondary);
 }
 
 .task-card {
-  background-color: white;
-  border: 1px solid #eee;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
   cursor: pointer;
-  transition: box-shadow 0.2s ease;
 }
 
-.task-card:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.task-card__title {
+  margin: 0 0 var(--spacing-xs) 0;
+  color: var(--color-secondary);
 }
 
-.task-card h4 {
-  margin: 0 0 0.5rem 0;
-  color: #2c3e50;
+.task-card__desc {
+  font-size: var(--font-size-md);
+  color: var(--color-gray-600);
+  margin-bottom: var(--spacing-xs);
 }
 
-.task-card p {
-  font-size: 0.9rem;
-  color: #7f8c8d;
-  margin-bottom: 0.5rem;
-}
-
-.task-card .task-meta {
+.task-card__meta {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8rem;
-  color: #95a5a6;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-500);
 }
 
-.priority-high {
-  border-left: 4px solid #e74c3c;
+/* 优先级样式（语义化命名） */
+.task-card--high {
+  border-left: 4px solid var(--color-danger);
 }
 
-.priority-medium {
-  border-left: 4px solid #f39c12;
+.task-card--medium {
+  border-left: 4px solid var(--color-warning);
 }
 
-.priority-low {
-  border-left: 4px solid #2ecc71;
+.task-card--low {
+  border-left: 4px solid var(--color-success);
+}
+
+/* 6. 响应式适配（提升移动端体验） */
+@media (max-width: 768px) {
+  .dashboard__main {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .sidebar,
+  .notifications-panel {
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--color-gray-300);
+  }
+
+  .tasks-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 7. 可访问性优化（焦点样式） */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }

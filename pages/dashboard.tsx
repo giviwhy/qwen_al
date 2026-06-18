@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Group, Task, Notification } from '../types';
+import { Group, Task, Notification, User } from '../types';
 import { useRouter } from 'next/router';
 
 const Dashboard: React.FC = () => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [allUserList, setAllUserList] = useState<User[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const { user, logout } = useAuth();
@@ -17,6 +18,10 @@ const Dashboard: React.FC = () => {
     const [newGroupForm, setNewGroupForm] = useState({ name: '', description: '' });
     const [editGroupId, setEditGroupId] = useState<string | null>(null);
     const [editGroupForm, setEditGroupForm] = useState({ name: '', description: '' });
+    const [memberPanelId, setMemberPanelId] = useState<string | null>(null);
+    // 管理员全局通知弹窗
+    const [showGlobalNotice, setShowGlobalNotice] = useState(false);
+    const [globalNoticeForm, setGlobalNoticeForm] = useState({ title: '', content: '' });
 
     // 统一带Token的请求封装
     const authFetch = async (url: string, options: RequestInit = {}) => {
@@ -38,14 +43,21 @@ const Dashboard: React.FC = () => {
         }
     }, [user, router]);
 
-    // 用户登录后拉取小组、通知
+    // 用户登录后拉取小组、通知、管理员拉取全部用户
     useEffect(() => {
         if (user) {
             fetchData();
+            if (user.role === 'admin') fetchAllUsers();
         }
     }, [user, selectedGroup]);
 
     if (!user) return <div>加载中...</div>;
+
+    // 获取全部系统用户（管理员组员下拉使用）
+    const fetchAllUsers = async () => {
+        const res = await authFetch('/api/users');
+        if (res.ok) setAllUserList(await res.json());
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -110,15 +122,78 @@ const Dashboard: React.FC = () => {
         if (res.ok) fetchData();
     };
 
+    // 添加组员到小组
+    const addGroupMember = async (groupId: string, uid: string) => {
+        await authFetch('/api/group/add-member', {
+            method: 'POST',
+            body: JSON.stringify({ groupId, userId: uid })
+        });
+        alert('添加组员成功');
+    };
+
+    // 修改小组组长
+    const changeGroupLeader = async (groupId: string, uid: string) => {
+        await authFetch('/api/group/set-leader', {
+            method: 'PUT',
+            body: JSON.stringify({ groupId, newLeaderId: uid })
+        });
+        fetchData();
+        alert('组长更换完成');
+    };
+
+    // 管理员发送全站通知
+    const sendGlobalNotice = async () => {
+        const res = await authFetch('/api/admin/send-all-notice', {
+            method: 'POST',
+            body: JSON.stringify(globalNoticeForm)
+        });
+        if (res.ok) {
+            alert('全站通知发送成功，所有用户已接收');
+            setShowGlobalNotice(false);
+            setGlobalNoticeForm({ title: '', content: '' });
+            fetchData();
+        }
+    };
+
     return (
         <div className="dashboard">
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1>团队协作任务看板</h1>
                 <div className="user-info" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <span>欢迎你，{user.username}（{user.role === 'admin' ? '管理员' : user.role === 'leader' ? '组长' : '普通成员'}）</span>
+                    {user.role === 'admin' && (
+                        <button onClick={() => setShowGlobalNotice(true)}>群发全站通知</button>
+                    )}
                     <button onClick={logout}>退出登录</button>
                 </div>
             </header>
+
+            {/* 管理员全局通知弹窗 */}
+            {showGlobalNotice && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+                    <div style={{ background: '#fff', padding: 20, width: 420 }}>
+                        <h3>发布全站公告</h3>
+                        <input
+                            placeholder="通知标题"
+                            value={globalNoticeForm.title}
+                            onChange={e => setGlobalNoticeForm({ ...globalNoticeForm, title: e.target.value })}
+                            style={{ width: '100%', margin: '8px 0', padding: 8 }}
+                        />
+                        <textarea
+                            placeholder="通知内容"
+                            value={globalNoticeForm.content}
+                            onChange={e => setGlobalNoticeForm({ ...globalNoticeForm, content: e.target.value })}
+                            rows={4}
+                            style={{ width: '100%', marginBottom: 12, padding: 8 }}
+                        />
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowGlobalNotice(false)}>取消</button>
+                            <button onClick={sendGlobalNotice}>发送公告</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main style={{ display: 'flex', gap: '1rem', marginTop: 16 }}>
                 <aside style={{ width: '240px' }}>
                     <h2>我的小组</h2>
@@ -166,11 +241,11 @@ const Dashboard: React.FC = () => {
                             >
                                 <h3>{group.name}</h3>
                                 <p>{group.description || '暂无描述'}</p>
-                                {group.leader_name && <small>组长：{group.leader_name}</small>}
+                                <small>组长：{group.leader_name ?? '暂无组长'}</small>
 
-                                {/* 管理员编辑、删除按钮 */}
+                                {/* 管理员全套操作按钮：编辑、删除、组员管理 */}
                                 {user.role === 'admin' && (
-                                    <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                                    <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -187,6 +262,49 @@ const Dashboard: React.FC = () => {
                                         >
                                             删除
                                         </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setMemberPanelId(group.id);
+                                            }}
+                                            style={{ fontSize: 12 }}
+                                        >
+                                            组员管理
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* 组员管理弹窗 */}
+                                {memberPanelId === group.id && (
+                                    <div onClick={e => e.stopPropagation()} style={{ border: '1px solid #aaa', padding: 10, marginTop: 8 }}>
+                                        <h5>组员操作面板</h5>
+                                        <p style={{ fontSize: 12, margin: '4px 0' }}>添加成员：</p>
+                                        <select
+                                            style={{ width: '100%', marginBottom: 6 }}
+                                            onChange={ev => {
+                                                const uid = ev.target.value;
+                                                if (uid) addGroupMember(group.id, uid);
+                                            }}
+                                        >
+                                            <option value="">选择用户加入小组</option>
+                                            {allUserList.map(u => (
+                                                <option key={u.id} value={u.id}>{u.username}</option>
+                                            ))}
+                                        </select>
+                                        <p style={{ fontSize: 12, margin: '4px 0' }}>更换本组组长：</p>
+                                        <select
+                                            style={{ width: '100%', marginBottom: 8 }}
+                                            onChange={ev => {
+                                                const uid = ev.target.value;
+                                                if (uid) changeGroupLeader(group.id, uid);
+                                            }}
+                                        >
+                                            <option value="">选择用户设为组长</option>
+                                            {allUserList.map(u => (
+                                                <option key={u.id} value={u.id}>{u.username}</option>
+                                            ))}
+                                        </select>
+                                        <button onClick={() => setMemberPanelId(null)} style={{ width: '100%' }}>关闭</button>
                                     </div>
                                 )}
 
@@ -216,7 +334,7 @@ const Dashboard: React.FC = () => {
 
                 <section className="main-content" style={{ flex: 1 }}>
                     {selectedGroup ? (
-                        <GroupView groupId={selectedGroup} authFetch={authFetch} />
+                        <GroupView groupId={selectedGroup} authFetch={authFetch} userRole={user.role} />
                     ) : (
                         <div>请选择左侧小组查看任务详情</div>
                     )}
@@ -235,7 +353,9 @@ const Dashboard: React.FC = () => {
                                     <h4>{notification.title}</h4>
                                     <p>{notification.content}</p>
                                     <small>
-                                        发送人：{notification.sender_name} |{' '}
+                                        发送人：{notification.sender_name}
+                                        {!notification.group_id && <span style={{ color: '#f44336' }}>【全站公告】</span>}
+                                        <br />
                                         {new Date(notification.created_at).toLocaleString()}
                                     </small>
                                 </div>
@@ -253,10 +373,10 @@ const Dashboard: React.FC = () => {
 interface GroupViewProps {
     groupId: string;
     authFetch: (url: string, opt?: RequestInit) => Promise<Response>;
+    userRole: string;
 }
 
-const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch }) => {
-    const { user } = useAuth();
+const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch, userRole }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [newTask, setNewTask] = useState({
@@ -312,7 +432,7 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch }) => {
                     priority: 'medium',
                 });
             } else {
-                alert('创建任务失败，请重试');
+                alert('创建任务失败，仅小组组长可发布任务');
             }
         } catch (err) {
             alert('网络异常，创建任务失败');
@@ -324,7 +444,8 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch }) => {
     return (
         <div className="group-view">
             <h2>任务列表</h2>
-            {(user.role === 'leader' || user.role === 'admin') && (
+            {/* 仅组长展示新建任务表单，管理员/普通成员隐藏 */}
+            {userRole === 'leader' ? (
                 <form onSubmit={handleCreateTask} className="create-task-form" style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <h3>新建任务</h3>
                     <input
@@ -361,7 +482,10 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId, authFetch }) => {
                     </select>
                     <button type="submit">提交创建任务</button>
                 </form>
-            )}
+            ) : userRole === 'admin' ? (
+                <p style={{ color: '#666' }}>提示：管理员无任务发布权限，请将组员设置为本组组长后发布任务</p>
+            ) : null}
+
             <div className="tasks-board" style={{ display: 'flex', gap: '0.8rem', overflowX: 'auto' }}>
                 <div className="task-column" style={{ minWidth: 220, border: '1px solid #eee', padding: 8 }}>
                     <h3>待处理</h3>
