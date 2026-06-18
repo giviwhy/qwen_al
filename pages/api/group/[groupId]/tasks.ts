@@ -30,14 +30,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(401).json({ success: false, msg: '登录失效', data: [] });
     }
 
-    // 2. 解析小组ID，强类型校验
+    // 2. 解析并强校验小组ID
     const { groupId } = req.query;
     const gid = Array.isArray(groupId) ? groupId[0] : groupId;
     if (!gid || typeof gid !== 'string') {
         return res.status(400).json({ success: false, msg: '小组ID无效', data: [] });
     }
 
-    // 3. 权限校验：管理员 OR 当前小组组长
+    // 3. 独立try：校验小组权限（管理员/本组组长）
     let isAdmin = loginRole === 'admin';
     let isGroupLeader = false;
     try {
@@ -51,18 +51,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ success: false, msg: '权限校验异常', data: [] });
     }
 
+    // 权限拦截：非管理员且非本组组长禁止操作
     if (!isAdmin && !isGroupLeader) {
         return res.status(403).json({ success: false, msg: '无权限操作该小组任务', data: [] });
     }
 
-    // GET 查询本组全部任务
+    // ====================== GET：查询本组所有任务 ======================
     if (req.method === 'GET') {
         try {
             const result = await db.query(`
                 SELECT t.*, u.username as assignee_name, c.username as creator_name
                 FROM tasks t
                 LEFT JOIN users u ON t.assigned_to = u.id
-                LEFT JOIN users c ON t.created_id = c.id
+                LEFT JOIN users c ON t.creator_id = c.id
                 WHERE t.group_id = $1
                 ORDER BY t.created_at DESC
             `, [gid]);
@@ -73,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
     }
 
-    // POST 新建任务
+    // ====================== POST：新建本组任务 ======================
     if (req.method === 'POST') {
         const { title, description, assignedTo, dueDate, priority } = req.body;
         const taskTitle = String(title || '').trim();
@@ -81,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(400).json({ success: false, msg: '任务标题不能为空', data: [] });
         }
 
-        // 校验分配人属于本组组员
+        // 校验分配人必须属于当前小组
         if (assignedTo) {
             try {
                 const memberCheck = await db.query(
@@ -97,6 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
         }
 
+        // 插入新任务
         try {
             const insertRes = await db.query(`
                 INSERT INTO tasks (group_id, title, description, assigned_to, creator_id, due_date, priority, status)
