@@ -1,0 +1,165 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f5f5f5;
+}
+
+.login-container {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.login-container form div {
+  margin-bottom: 15px;
+}
+
+.login-container label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.login-container input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.login-container button {
+  width: 100%;
+  padding: 10px;
+  background-color: #0070f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dashboard {
+  min-height: 100vh;
+}
+
+.dashboard header {
+  background-color: #2c3e50;
+  color: white;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dashboard main {
+  display: flex;
+  height: calc(100vh - 70px);
+}
+
+aside {
+  width: 250px;
+  background-color: white;
+  padding: 1rem;
+  border-right: 1px solid #eee;
+  overflow-y: auto;
+}
+
+.groups-list .group-item {
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.groups-list .group-item.active {
+  border-color: #0070f3;
+  background-color: #e6f0ff;
+}
+
+.main-content {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.notifications-panel {
+  width: 300px;
+  background-color: white;
+  border-left: 1px solid #eee;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.notifications-list .notification {
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.notifications-list .notification.unread {
+  background-color: #f0f8ff;
+  border-left: 4px solid #0070f3;
+}
+
+.group-view h2 {
+  margin-bottom: 1rem;
+}
+
+.create-task-form {
+  background-color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  margin-bottom: 1rem;
+}
+
+.create-task-form input,
+.create-task-form textarea,
+.create-task-form select {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tasks-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.task-column {
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.task-column h3 {
+  margin-bottom: 1rem;
+  text-align: center;
+  color: #2c3e50;
+}
+
+.task-card {
+  background-color: white;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+ 

@@ -1,0 +1,22 @@
+# 依赖包，体积巨大无需上传
+node_modules
+
+# Next编译产物
+.next
+out
+
+# 环境密钥文件（里面存数据库密码，绝对不能上传！）
+.env
+.env.local
+.env.production
+
+# Vercel本地配置
+.vercel
+
+# 日志、缓存文件
+npm-debug.log
+yarn-error.log
+
+# 系统隐藏文件
+.DS_Store
+Thumbs.db
