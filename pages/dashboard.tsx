@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Group, Task, Notification } from '../types';
 import { useRouter } from 'next/router';
+
 const Dashboard: React.FC = () => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -10,32 +11,35 @@ const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const { user, logout } = useAuth();
     const router = useRouter();
+
     useEffect(() => {
         if (!user) {
             router.push('/login');
         }
     }, [user, router]);
+
     useEffect(() => {
         if (user) {
             fetchData();
         }
     }, [user, selectedGroup]);
+
+    // 【修改 2】新增拦截逻辑：如果 user 为空，直接返回 Loading，防止下面读取空值
+    if (!user) {
+        return <div>Loading...</div>;
+    }
+
     const fetchData = async () => {
         if (!user) return;
-
         try {
             setLoading(true);
-
             // 获取用户所在的所有小组
             const groupsResponse = await fetch('/api?endpoint=groups', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             if (groupsResponse.ok) {
                 const groupsData = await groupsResponse.json();
                 setGroups(groupsData);
-
                 // 如果还没有选中组，则选中第一个
                 if (!selectedGroup && groupsData.length > 0) {
                     setSelectedGroup(groupsData[0].id);
@@ -44,9 +48,7 @@ const Dashboard: React.FC = () => {
 
             // 获取通知
             const notificationsResponse = await fetch('/api?endpoint=notifications', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             if (notificationsResponse.ok) {
                 const notificationsData = await notificationsResponse.json();
@@ -68,11 +70,11 @@ const Dashboard: React.FC = () => {
             <header>
                 <h1>Team Collaboration Board</h1>
                 <div className="user-info">
-                    <span>Welcome, {user.username} ({user.role})</span>
+                    {/* 【修改 1】欢迎文字：增加可选链 ?. */}
+                    <span>Welcome, {user?.username} ({user?.role})</span>
                     <button onClick={logout}>Logout</button>
                 </div>
             </header>
-
             <main>
                 <aside>
                     <h2>Your Groups</h2>
@@ -106,21 +108,24 @@ const Dashboard: React.FC = () => {
                             notifications.map(notification => (
                                 <div
                                     key={notification.id}
-                                    className={`notification ${notification.is_read ? 'read' : 'unread'}`}
-                                >
-                                    <h4>{notification.title}</h4>
-                                    <p>{notification.content}</p>
-                                    <small>From: {notification.sender_name} | {new Date(notification.created_at).toLocaleString()}</small>
-                                </div>
-                            ))
-                        ) : (
-                            <p>No notifications</p>
-                        )}
-                    </div>
-                </aside>
-            </main>
-        </div>
-    );
+                                    className={`notification ${notification.is_read ? 'read' : 'unread'}`
+                                        >
+                  <h4>{notification.title}</h4>
+                  <p>{notification.content}</p>
+                  <small>
+                    From: {notification.sender_name} |{' '}
+                    {new Date(notification.created_at).toLocaleString()}
+                  </small>
+                </div>
+                    ))
+                    ) : (
+                    <p>No notifications</p>
+            )}
+                </div>
+            </aside>
+        </main>
+    </div >
+  );
 };
 
 interface GroupViewProps {
@@ -131,7 +136,13 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId }) => {
     const { user } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
-    const [newTask, setNewTask] = useState({ title: '', description: '', assignedTo: '', dueDate: '', priority: 'medium' });
+    const [newTask, setNewTask] = useState({
+        title: '',
+        description: '',
+        assignedTo: '',
+        dueDate: '',
+        priority: 'medium',
+    });
 
     useEffect(() => {
         fetchTasks();
@@ -141,11 +152,8 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId }) => {
         try {
             setLoading(true);
             const response = await fetch(`/api?endpoint=tasks&groupId=${groupId}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             });
-
             if (response.ok) {
                 const tasksData = await response.json();
                 setTasks(tasksData);
@@ -159,12 +167,11 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId }) => {
 
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
-
         const response = await fetch('/api?endpoint=tasks', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
             },
             body: JSON.stringify({
                 title: newTask.title,
@@ -172,14 +179,20 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId }) => {
                 groupId: groupId,
                 assignedTo: newTask.assignedTo || null,
                 dueDate: newTask.dueDate || null,
-                priority: newTask.priority
-            })
+                priority: newTask.priority,
+            }),
         });
 
         if (response.ok) {
             const createdTask = await response.json();
             setTasks([createdTask, ...tasks]);
-            setNewTask({ title: '', description: '', assignedTo: '', dueDate: '', priority: 'medium' });
+            setNewTask({
+                title: '',
+                description: '',
+                assignedTo: '',
+                dueDate: '',
+                priority: 'medium',
+            });
         } else {
             alert('Failed to create task');
         }
@@ -190,7 +203,7 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId }) => {
     return (
         <div className="group-view">
             <h2>Tasks</h2>
-
+            {/* 【修改 1】权限判断：增加可选链 ?. */}
             {(user?.role === 'leader' || user?.role === 'admin') && (
                 <form onSubmit={handleCreateTask} className="create-task-form">
                     <h3>Create New Task</h3>
@@ -211,7 +224,6 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId }) => {
                         onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
                     >
                         <option value="">Assign to...</option>
-                        {/* 在实际应用中，这里应该从API获取小组成员列表 */}
                         <option value="">Unassigned</option>
                     </select>
                     <input
@@ -230,7 +242,6 @@ const GroupView: React.FC<GroupViewProps> = ({ groupId }) => {
                     <button type="submit">Create Task</button>
                 </form>
             )}
-
             <div className="tasks-board">
                 <div className="task-column">
                     <h3>To Do</h3>
@@ -267,7 +278,6 @@ interface TaskCardProps {
 
 const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
     const [showDetails, setShowDetails] = useState(false);
-
     return (
         <div className="task-card">
             <div className="task-header" onClick={() => setShowDetails(!showDetails)}>
@@ -286,5 +296,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
         </div>
     );
 };
+
+// 【修改 3】关闭静态预渲染，根治构建报错
+export const dynamic = "force-dynamic";
 
 export default Dashboard;
