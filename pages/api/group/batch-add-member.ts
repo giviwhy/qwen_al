@@ -23,13 +23,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-        // 循环批量插入，冲突跳过
-        for (const uid of userIds) {
-            await db.query(`
-                INSERT INTO group_members (group_id, user_id)
-                VALUES ($1, $2) ON CONFLICT DO NOTHING
-            `, [groupId, uid]);
-        }
+        // 批量插入，使用 UNNEST 一次性插入所有用户，冲突跳过
+        const values = userIds.map((uid, index) => `($1, $${index + 2})`).join(', ');
+        const params = [groupId, ...userIds];
+        
+        await db.query(`
+            INSERT INTO group_members (group_id, user_id)
+            VALUES ${values}
+            ON CONFLICT DO NOTHING
+        `, params);
+        
         return res.json({ success: true, msg: '批量添加组员成功' });
     } catch (err) {
         console.error('批量添加组员失败', err);

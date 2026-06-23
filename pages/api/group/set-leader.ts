@@ -37,6 +37,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ON CONFLICT (group_id, user_id) DO NOTHING
         `, [groupId, newLeaderId]);
 
+        // 3. 将用户角色更新为 leader（如果还不是 leader）
+        await db.query(
+            'UPDATE users SET role = $1 WHERE id = $2 AND role != $1',
+            ['leader', newLeaderId]
+        );
+
         return res.json({ success: true, msg: '组长更换成功' });
     } catch (err) {
         console.error('修改组长接口错误：', err);

@@ -33,10 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const result = await db.query(`
-        SELECT u.id, u.username
+        SELECT u.id, u.username, u.role
         FROM group_members gm
         LEFT JOIN users u ON gm.user_id = u.id
-        WHERE gm.group_id = $1
+        WHERE gm.group_id = $1 AND u.role NOT IN ('leader', 'admin')
     `, [gid]);
         return res.json({ success: true, data: result.rows, msg: '查询成功' });
     } catch (globalErr) {

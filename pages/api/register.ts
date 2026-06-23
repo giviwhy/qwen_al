@@ -29,8 +29,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(400).json({ success: false, msg: '用户名或邮箱已被注册' });
         }
 
-        // 3. 密码加密
-        const hashPwd = await bcrypt.hash(pwd, 10);
+        // 3. 密码加密（开发环境使用6轮盐以提升性能）
+        const hashPwd = await bcrypt.hash(pwd, 6);
 
         // 4. 插入用户，把 password_hash 改成 password
         const insertRes = await db.query(
